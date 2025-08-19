@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+wget = "^3.2"
+tqdm = "^4.67.1"
+numpy = "^2.3.2"
+torch = "^2.8.0"
+tb-nightly = "^2.21.0a20250818"
+pandas = "^2.3.1"
+scipy = "^1.16.1"
+future = "^1.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
