@@ -16,6 +16,7 @@ if __name__ == '__main__':
 
     print("downloading...")
     dataset.maybe_download_raw_dataset()
+    dataset.preprocess()
 
     # print("load df...")
     # ratings_df = dataset.load_ratings_df()

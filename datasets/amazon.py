@@ -40,11 +40,11 @@ class AmazonDataset(AbstractDataset):
         file_path = folder_path.joinpath('amazon.json')
         df = pd.read_json(file_path, lines=True)
         # 必要なカラムだけ抽出
-        df = df[['reviewerID', 'asin', 'reviewText', 'unixReviewTime']]
+        df = df[['reviewerID', 'asin', 'overall', 'unixReviewTime']]
         df = df.rename(columns={
             'reviewerID': 'uid',
             'asin': 'sid',
-            'reviewText': 'text',
+            'overall': 'rating',
             'unixReviewTime': 'timestamp'
         })
         # timestampをint型に変換

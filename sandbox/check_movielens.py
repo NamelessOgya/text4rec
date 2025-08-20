@@ -10,4 +10,3 @@ if __name__ == "__main__":
         obj = pk.load(f)
     
     print(type(obj))
-    
