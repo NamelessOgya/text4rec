@@ -1,10 +1,13 @@
-FROM python:3.11.13-slim
+FROM python:3.11.13
 
-# 必要なシステムパッケージのインストール
+# 必要なシステムパッケージのインストールと証明書ストアの更新
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
     git \
+    ca-certificates \
+    openssl \
+ && update-ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 # Poetryのインストール
@@ -17,3 +20,7 @@ WORKDIR /workspace
 
 # Poetry の設定（仮想環境をコンテナ内に作成）
 RUN poetry config virtualenvs.in-project true
+
+# 依存関係のインストール
+COPY pyproject.toml poetry.lock* ./
+RUN poetry install --no-interaction --no-ansi --no-root
