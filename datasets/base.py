@@ -56,6 +56,15 @@ class AbstractDataset(metaclass=ABCMeta):
 
     @abstractmethod
     def load_ratings_df(self):
+        """
+            ratings.datの読み込み
+            uid, sid, rating, timestampのカラムを持つDataFrameを返す   
+            uid: ユーザID
+            sid: アイテムID
+            rating: レーティング
+            timestamp: タイムスタンプ
+            return: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+        """
         pass
 
     def load_dataset(self):
@@ -80,34 +89,53 @@ class AbstractDataset(metaclass=ABCMeta):
             return
         print("Raw file doesn't exist. Downloading...")
         self._download_raw_dataset()
-        
+    
+    def preprocess(self):
+        dataset_path = self._get_preprocessed_dataset_path()
+        if dataset_path.is_file():
+            print('Already preprocessed. Skip preprocessing')
+            return
+        if not dataset_path.parent.is_dir():
+            dataset_path.parent.mkdir(parents=True)
+        self.maybe_download_raw_dataset()
+        df = self.load_ratings_df()
+        df = self.make_implicit(df) #特定のratingより高いものを抽出。
+        df = self.filter_triplets(df) #user, item出現回数が高いものに限定
+        df, umap, smap = self.densify_index(df)
+        train, val, test = self.split_df(df, len(umap))
+        dataset = {'train': train,
+                   'val': val,
+                   'test': test,
+                   'umap': umap,
+                   'smap': smap}
+        with dataset_path.open('wb') as f:
+            pickle.dump(dataset, f)
+
     def make_implicit(self, df):
-        print('Turning into implicit ratings')
-        df = df[df['rating'] >= self.min_rating]
-        # return df[['uid', 'sid', 'timestamp']]
-        return df
+        """
+            ratingがmin_rating以上のものを抽出する。
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']    
+            return: DataFrame with implicit ratings
+        """
+        pass
 
     def filter_triplets(self, df):
-        print('Filtering triplets')
-        if self.min_sc > 0:
-            item_sizes = df.groupby('sid').size()
-            good_items = item_sizes.index[item_sizes >= self.min_sc]
-            df = df[df['sid'].isin(good_items)]
-
-        if self.min_uc > 0:
-            user_sizes = df.groupby('uid').size()
-            good_users = user_sizes.index[user_sizes >= self.min_uc]
-            df = df[df['uid'].isin(good_users)]
-
-        return df
+        """
+            登場回数が少ないuser, itemを除外する。
+            min_sc: itemの最小登場回数
+            min_uc: userの最小登場回数
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+            return: Filtered DataFrame
+        """
+        pass
+    
 
     def densify_index(self, df):
-        print('Densifying index')
-        umap = {u: i for i, u in enumerate(set(df['uid']))}
-        smap = {s: i for i, s in enumerate(set(df['sid']))}
-        df['uid'] = df['uid'].map(umap)
-        df['sid'] = df['sid'].map(smap)
-        return df, umap, smap
+        """
+            userのmappingとitemのmappingを作成し、indexを0から始まる連番に変換する。
+            df, umap, smap
+        """
+        pass
 
     def split_df(self, df, user_count):
         if self.args.split == 'leave_one_out':

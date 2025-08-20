@@ -31,32 +31,64 @@ class ML1MDataset(AbstractDataset):
                 'users.dat']
 
     def load_ratings_df(self):
+        """
+            ratings.datの読み込み
+            uid, sid, rating, timestampのカラムを持つDataFrameを返す   
+            uid: ユーザID
+            sid: アイテムID
+            rating: レーティング
+            timestamp: タイムスタンプ
+            return: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+        """
         folder_path = self._get_rawdata_folder_path()
         file_path = folder_path.joinpath('ratings.dat')
         df = pd.read_csv(file_path, sep='::', header=None)
         df.columns = ['uid', 'sid', 'rating', 'timestamp']
         return df
     
-    def preprocess(self):
-        dataset_path = self._get_preprocessed_dataset_path()
-        if dataset_path.is_file():
-            print('Already preprocessed. Skip preprocessing')
-            return
-        if not dataset_path.parent.is_dir():
-            dataset_path.parent.mkdir(parents=True)
-        self.maybe_download_raw_dataset()
-        df = self.load_ratings_df()
-        df = self.make_implicit(df)
-        df = self.filter_triplets(df)
-        df, umap, smap = self.densify_index(df)
-        train, val, test = self.split_df(df, len(umap))
-        dataset = {'train': train,
-                   'val': val,
-                   'test': test,
-                   'umap': umap,
-                   'smap': smap}
-        with dataset_path.open('wb') as f:
-            pickle.dump(dataset, f)
+    def make_implicit(self, df):
+        """
+            ratingがmin_rating以上のものを抽出する。
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']    
+            return: DataFrame with implicit ratings
+        """
+        print('Turning into implicit ratings')
+        df = df[df['rating'] >= self.min_rating] #特定のratingより高いものを抽出。
+        # return df[['uid', 'sid', 'timestamp']]
+        return df
+    
+    def filter_triplets(self, df):
+        """
+            登場回数が少ないuser, itemを除外する。
+            min_sc: itemの最小登場回数
+            min_uc: userの最小登場回数
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+            return: Filtered DataFrame
+        """
+        print('Filtering triplets')
+        if self.min_sc > 0:
+            item_sizes = df.groupby('sid').size() #sid出現回数を数える。
+            good_items = item_sizes.index[item_sizes >= self.min_sc] #一定以上登場しているものに限定
+            df = df[df['sid'].isin(good_items)]
+
+        if self.min_uc > 0:
+            user_sizes = df.groupby('uid').size() #uid出現回数を数える。
+            good_users = user_sizes.index[user_sizes >= self.min_uc] #一定以上登場しているものに限定
+            df = df[df['uid'].isin(good_users)]
+
+        return df
+    
+    def densify_index(self, df):
+        """
+            userのmappingとitemのmappingを作成し、indexを0から始まる連番に変換する。
+            df, umap, smap
+        """
+        print('Densifying index')
+        umap = {u: i for i, u in enumerate(set(df['uid']))}
+        smap = {s: i for i, s in enumerate(set(df['sid']))}
+        df['uid'] = df['uid'].map(umap)
+        df['sid'] = df['sid'].map(smap)
+        return df, umap, smap
     
     def _download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
