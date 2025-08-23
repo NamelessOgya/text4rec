@@ -16,7 +16,7 @@ class AmazonDataset(AbstractDataset):
     @classmethod
     def url(cls):
         # 例: Digital Music
-        return 'https://jmcauley.ucsd.edu/data/amazon_v2/categoryFilesSmall/AMAZON_FASHION_5.json.gz'
+        return 'https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/AMAZON_FASHION.json.gz'
 
     @classmethod
     def is_zipfile(cls):
