@@ -5,17 +5,28 @@ from tqdm import tqdm
 
 from pathlib import Path
 import zipfile
+import gzip
+import shutil
 import sys
+import ssl
+import urllib.request
 
 
 def download(url, savepath):
-    wget.download(url, str(savepath))
+    context = ssl._create_unverified_context()
+    with urllib.request.urlopen(url, context=context) as response, open(savepath, 'wb') as out_file:
+        out_file.write(response.read())
 
 
 def unzip(zippath, savepath):
     zip = zipfile.ZipFile(zippath)
     zip.extractall(savepath)
     zip.close()
+
+# for gz files
+def ungzip(gzpath, savepath):
+    with gzip.open(gzpath, 'rb') as f_in, open(savepath, 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
 
 
 def get_count(tp, id):

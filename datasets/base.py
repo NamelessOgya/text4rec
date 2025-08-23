@@ -43,6 +43,10 @@ class AbstractDataset(metaclass=ABCMeta):
         return True
 
     @classmethod
+    def is_gzfile(cls):
+        return False
+
+    @classmethod
     def zip_file_content_is_folder(cls):
         return True
 
@@ -52,14 +56,40 @@ class AbstractDataset(metaclass=ABCMeta):
 
     @abstractmethod
     def load_ratings_df(self):
+        """
+            ratings.datの読み込み
+            uid, sid, rating, timestampのカラムを持つDataFrameを返す   
+            uid: ユーザID
+            sid: アイテムID
+            rating: レーティング
+            timestamp: タイムスタンプ
+            return: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+        """
         pass
 
     def load_dataset(self):
+        """
+        Load the preprocessed dataset.
+        """
         self.preprocess()
         dataset_path = self._get_preprocessed_dataset_path()
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
 
+    def preprocess(self):
+        pass
+        
+
+    def maybe_download_raw_dataset(self):
+        folder_path = self._get_rawdata_folder_path()
+        if folder_path.is_dir() and\
+           all(folder_path.joinpath(filename).is_file() for filename in self.all_raw_file_names()):
+            
+            print('Raw data already exists. Skip downloading')  
+            return
+        print("Raw file doesn't exist. Downloading...")
+        self._download_raw_dataset()
+    
     def preprocess(self):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
@@ -69,8 +99,8 @@ class AbstractDataset(metaclass=ABCMeta):
             dataset_path.parent.mkdir(parents=True)
         self.maybe_download_raw_dataset()
         df = self.load_ratings_df()
-        df = self.make_implicit(df)
-        df = self.filter_triplets(df)
+        df = self.make_implicit(df) #特定のratingより高いものを抽出。
+        df = self.filter_triplets(df) #user, item出現回数が高いものに限定
         df, umap, smap = self.densify_index(df)
         train, val, test = self.split_df(df, len(umap))
         dataset = {'train': train,
@@ -81,54 +111,44 @@ class AbstractDataset(metaclass=ABCMeta):
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)
 
-    def maybe_download_raw_dataset(self):
-        folder_path = self._get_rawdata_folder_path()
-        if folder_path.is_dir() and\
-           all(folder_path.joinpath(filename).is_file() for filename in self.all_raw_file_names()):
-            print('Raw data already exists. Skip downloading')
-            return
-        print("Raw file doesn't exist. Downloading...")
-        if self.is_zipfile():
-            tmproot = Path(tempfile.mkdtemp())
-            tmpzip = tmproot.joinpath('file.zip')
-            tmpfolder = tmproot.joinpath('folder')
-            download(self.url(), tmpzip)
-            unzip(tmpzip, tmpfolder)
-            if self.zip_file_content_is_folder():
-                tmpfolder = tmpfolder.joinpath(os.listdir(tmpfolder)[0])
-            shutil.move(tmpfolder, folder_path)
-            shutil.rmtree(tmproot)
-            print()
-        else:
-            tmproot = Path(tempfile.mkdtemp())
-            tmpfile = tmproot.joinpath('file')
-            download(self.url(), tmpfile)
-            folder_path.mkdir(parents=True)
-            shutil.move(tmpfile, folder_path.joinpath('ratings.csv'))
-            shutil.rmtree(tmproot)
-            print()
-
     def make_implicit(self, df):
+        """
+            ratingがmin_rating以上のものを抽出する。
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']    
+            return: DataFrame with implicit ratings
+        """
         print('Turning into implicit ratings')
-        df = df[df['rating'] >= self.min_rating]
+        df = df[df['rating'] >= self.min_rating] #特定のratingより高いものを抽出。
         # return df[['uid', 'sid', 'timestamp']]
         return df
 
     def filter_triplets(self, df):
+        """
+            登場回数が少ないuser, itemを除外する。
+            min_sc: itemの最小登場回数
+            min_uc: userの最小登場回数
+            df: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+            return: Filtered DataFrame
+        """
         print('Filtering triplets')
         if self.min_sc > 0:
-            item_sizes = df.groupby('sid').size()
-            good_items = item_sizes.index[item_sizes >= self.min_sc]
+            item_sizes = df.groupby('sid').size() #sid出現回数を数える。
+            good_items = item_sizes.index[item_sizes >= self.min_sc] #一定以上登場しているものに限定
             df = df[df['sid'].isin(good_items)]
 
         if self.min_uc > 0:
-            user_sizes = df.groupby('uid').size()
-            good_users = user_sizes.index[user_sizes >= self.min_uc]
+            user_sizes = df.groupby('uid').size() #uid出現回数を数える。
+            good_users = user_sizes.index[user_sizes >= self.min_uc] #一定以上登場しているものに限定
             df = df[df['uid'].isin(good_users)]
 
         return df
+    
 
     def densify_index(self, df):
+        """
+            userのmappingとitemのmappingを作成し、indexを0から始まる連番に変換する。
+            df, umap, smap
+        """
         print('Densifying index')
         umap = {u: i for i, u in enumerate(set(df['uid']))}
         smap = {s: i for i, s in enumerate(set(df['sid']))}
@@ -190,4 +210,11 @@ class AbstractDataset(metaclass=ABCMeta):
     def _get_preprocessed_dataset_path(self):
         folder = self._get_preprocessed_folder_path()
         return folder.joinpath('dataset.pkl')
+
+    def _download_raw_dataset(self):
+        """
+        maybe_download_raw_dataset() でダウンロードが必要になった際の挙動は
+        各Datasetクラスで実装する。
+        """
+        pass
 

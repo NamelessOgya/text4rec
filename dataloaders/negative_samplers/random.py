@@ -29,7 +29,7 @@ class RandomNegativeSampler(AbstractNegativeSampler):
             for _ in range(self.sample_size):
                 item = np.random.choice(self.item_count) + 1
                 while item in seen or item in samples:
-                    item = np.random.choice(self.item_count) + 1
+                    item = np.random.choice(self.item_count) + 1 #ここで止まってそう。
                 samples.append(item)
 
             negative_samples[user] = samples
