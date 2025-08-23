@@ -1,11 +1,12 @@
-from .bert import BERTModel
+from .bert import BERTModel, BERTEmbeddingModel
 from .dae import DAEModel
 from .vae import VAEModel
 
 MODELS = {
     BERTModel.code(): BERTModel,
     DAEModel.code(): DAEModel,
-    VAEModel.code(): VAEModel
+    VAEModel.code(): VAEModel,
+    BERTEmbeddingModel.code(): BERTEmbeddingModel,
 }
 
 
