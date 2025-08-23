@@ -15,6 +15,7 @@ tb-nightly = "^2.21.0a20250818"
 pandas = "^2.3.1"
 scipy = "^1.16.1"
 future = "^1.0.0"
+transformers = "^4.55.4"
 
 
 [build-system]
