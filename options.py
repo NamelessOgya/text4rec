@@ -67,6 +67,7 @@ parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--weight_decay', type=float, default=0, help='l2 regularization')
 parser.add_argument('--momentum', type=float, default=None, help='SGD momentum')
 # lr scheduler #
+parser.add_argument('--enable_lr_schedule', action='store_true', help='Whether to enable learning rate scheduler.')
 parser.add_argument('--decay_step', type=int, default=15, help='Decay step for StepLR')
 parser.add_argument('--gamma', type=float, default=0.1, help='Gamma for StepLR')
 # epochs #
