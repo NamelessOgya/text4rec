@@ -1,4 +1,5 @@
-from .bert import BERTModel, BERTEmbeddingModel
+from .bert import BERTModel
+from .bertemb import BERTEmbeddingModel
 from .dae import DAEModel
 from .vae import VAEModel
 

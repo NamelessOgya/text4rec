@@ -1,5 +1,6 @@
 from datasets import dataset_factory
-from .bert import BertDataloader, BertEmbeddingDataloader
+from .bert import BertDataloader
+from .bertemb import  BertEmbeddingDataloader
 from .ae import AEDataloader
 
 
