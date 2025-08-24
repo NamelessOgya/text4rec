@@ -207,7 +207,7 @@ class AbstractTrainer(metaclass=ABCMeta):
                 MetricGraphPrinter(writer, key='Recall@%d' % k, graph_name='Recall@%d' % k, group_name='Validation'))
         val_loggers.append(RecentModelLogger(model_checkpoint))
         val_loggers.append(BestModelLogger(model_checkpoint, metric_key=self.best_metric))
-        val_loggers.append(EpochModelLogger(model_checkpoint))
+        # val_loggers.append(EpochModelLogger(model_checkpoint)) # Disabled to save storage
         return writer, train_loggers, val_loggers
 
     def _create_state_dict(self):

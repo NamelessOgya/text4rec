@@ -7,8 +7,8 @@ read -p "This will delete ./Data/amazon and ./Data/preprocessed. Continue? (y/n)
 echo
 if [[ $answer =~ [Yy] ]]; then
     echo "Deleting preprocessed data..."
-    rm -rf ./Data/amazon
-    rm -rf ./Data/preprocessed
+    # rm -rf ./Data/amazon
+    # rm -rf ./Data/preprocessed
 
     echo "Starting training..."
     poetry run python main.py \
@@ -34,7 +34,7 @@ if [[ $answer =~ [Yy] ]]; then
         --test_negative_sample_size 100 \
         --test_negative_sampling_seed 98765 \
         --optimizer Adam \
-        --lr 0.001 \
+        --lr 0.0001 \
         --enable_lr_schedule \
         --decay_step 25 \
         --gamma 1.0 \
