@@ -9,7 +9,9 @@ if [[ $answer =~ [Yy] ]]; then
     echo "deleting..."
     rm -rf ./Data/amazon
     rm -rf ./Data/preprocessed
-    poetry run python main.py --template train_bert
+    poetry run python main.py --template train_bert --dataset_code amazon --generate_item_embeddings \
+    --bert_hidden_units 1024
+
 
 else
     echo "中止しました。"

@@ -1,7 +1,8 @@
 from .base import BaseModel
 from .bert_modules.bert import BERT
-
+import torch
 import torch.nn as nn
+import numpy as np
 
 
 class BERTModel(BaseModel):
