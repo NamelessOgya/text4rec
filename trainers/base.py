@@ -32,6 +32,13 @@ class AbstractTrainer(metaclass=ABCMeta):
         self.num_epochs = args.num_epochs
         self.metric_ks = args.metric_ks
         self.best_metric = args.best_metric
+        print(f'Best metric: {self.best_metric}')
+        # Ensure that the k from best_metric is included in metric_ks
+        if '@' in self.best_metric:
+            k_from_best_metric = int(self.best_metric.split('@')[1])
+            if k_from_best_metric not in self.metric_ks:
+                self.metric_ks.append(k_from_best_metric)
+                self.metric_ks.sort() # Keep it sorted for consistency
 
         self.export_root = export_root
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
@@ -72,6 +79,7 @@ class AbstractTrainer(metaclass=ABCMeta):
             self.validate(epoch, accum_iter)
         self.logger_service.complete({
             'state_dict': (self._create_state_dict()),
+            'epoch': self.num_epochs
         })
         self.writer.close()
 
@@ -199,6 +207,7 @@ class AbstractTrainer(metaclass=ABCMeta):
                 MetricGraphPrinter(writer, key='Recall@%d' % k, graph_name='Recall@%d' % k, group_name='Validation'))
         val_loggers.append(RecentModelLogger(model_checkpoint))
         val_loggers.append(BestModelLogger(model_checkpoint, metric_key=self.best_metric))
+        val_loggers.append(EpochModelLogger(model_checkpoint))
         return writer, train_loggers, val_loggers
 
     def _create_state_dict(self):
