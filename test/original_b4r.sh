@@ -1,7 +1,9 @@
 #!/bin/bash
+
+# original caseのb4rがちゃんと動くかを試す。
 echo "=== test original training using amazon dataset ==="
 
-read -p "dekete ./Data/amazon, ./Data/preprocessed (y/n): " -n 1 answer
+read -p "delete ./Data/amazon, ./Data/preprocessed (y/n): " -n 1 answer
 echo    # 改行を入れる
 if [[ $answer =~ [Yy] ]]; then
     echo "deleting..."

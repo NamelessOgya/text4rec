@@ -8,9 +8,8 @@ echo    # 改行を入れる
 if [[ $answer =~ [Yy] ]]; then
     echo "deleting..."
     rm -rf ./Data/amazon
-    # rm -rf ./Data/preprocessed
-    poetry run python main.py --template train_bert \
-    --item_embedding_path text4rec/Data/preprocessed/amazon_min_rating4-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy \
+    rm -rf ./Data/preprocessed
+    poetry run python main.py --template train_bert --dataset_code amazon --generate_item_embeddings \
     --bert_hidden_units 1024
 
 

@@ -87,6 +87,13 @@ parser.add_argument('--anneal_cap', type=float, default=0.2, help='Upper limit o
 ################
 parser.add_argument('--model_code', type=str, default='bert', choices=MODELS.keys())
 parser.add_argument('--model_init_seed', type=int, default=None)
+################
+# Embedding
+################
+parser.add_argument('--generate_item_embeddings', action='store_true', help='Whether to generate item embeddings from text.')
+parser.add_argument('--embedding_model_name', type=str, default='intfloat/multilingual-e5-large', help='Name of the E5 model from Hugging Face.')
+parser.add_argument('--embedding_batch_size', type=int, default=32, help='Batch size for embedding generation.')
+
 # BERT #
 parser.add_argument('--item_embedding_path', type=str, default=None, help='Path to the pre-trained item embeddings .npy file')
 parser.add_argument('--bert_max_len', type=int, default=None, help='Length of sequence for bert')
