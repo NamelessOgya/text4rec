@@ -1,11 +1,13 @@
 from datasets import dataset_factory
 from .bert import BertDataloader
+from .bertemb import  BertEmbeddingDataloader
 from .ae import AEDataloader
 
 
 DATALOADERS = {
     BertDataloader.code(): BertDataloader,
-    AEDataloader.code(): AEDataloader
+    AEDataloader.code(): AEDataloader,
+    BertEmbeddingDataloader.code(): BertEmbeddingDataloader,
 }
 
 

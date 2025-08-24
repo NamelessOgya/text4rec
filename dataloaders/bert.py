@@ -89,20 +89,21 @@ class BertTrainDataset(data_utils.Dataset):
         labels = []
         for s in seq:
             prob = self.rng.random()
+            # 一定確率でmaskにする
             if prob < self.mask_prob:
                 prob /= self.mask_prob
 
-                if prob < 0.8:
+                if prob < 0.8: # todo ハードコード直す
                     tokens.append(self.mask_token)
-                elif prob < 0.9:
+                elif prob < 0.9: # todo ハードコード直す
                     tokens.append(self.rng.randint(1, self.num_items))
                 else:
                     tokens.append(s)
 
-                labels.append(s)
+                labels.append(s) # maskされたものにだけラベルがつく。
             else:
                 tokens.append(s)
-                labels.append(0)
+                labels.append(0) # maskされてないもののラベルは0
 
         tokens = tokens[-self.max_len:]
         labels = labels[-self.max_len:]

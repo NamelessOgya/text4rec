@@ -57,13 +57,13 @@ class AbstractDataset(metaclass=ABCMeta):
     @abstractmethod
     def load_ratings_df(self):
         """
-            ratings.datの読み込み
-            uid, sid, rating, timestampのカラムを持つDataFrameを返す   
-            uid: ユーザID
-            sid: アイテムID
-            rating: レーティング
-            timestamp: タイムスタンプ
-            return: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
+        ratings.datの読み込み
+        uid, sid, rating, timestampのカラムを持つDataFrameを返す   
+        uid: ユーザID
+        sid: アイテムID
+        rating: レーティング
+        timestamp: タイムスタンプ
+        return: DataFrame with columns ['uid', 'sid', 'rating', 'timestamp']
         """
         pass
 
@@ -72,6 +72,8 @@ class AbstractDataset(metaclass=ABCMeta):
         Load the preprocessed dataset.
         """
         self.preprocess()
+        if self.args.generate_item_embeddings:
+            self.generate_and_save_item_embeddings()
         dataset_path = self._get_preprocessed_dataset_path()
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
@@ -79,10 +81,39 @@ class AbstractDataset(metaclass=ABCMeta):
     def preprocess(self):
         pass
         
+    def generate_and_save_item_embeddings(self):
+        print('Generating and saving item embeddings...')
+        dataset_path = self._get_preprocessed_dataset_path()
+        with open(dataset_path, 'rb') as f:
+            dataset = pickle.load(f)
+
+        if 'item_text' not in dataset:
+            print('item_text not found in dataset. Skipping embedding generation.')
+            return
+
+        item_text_dict = dataset['item_text']
+        smap = dataset['smap']
+        num_items = max(smap.values()) + 1
+
+        texts_to_embed = []
+        placeholder_text = ""
+        for i in range(num_items):
+            texts_to_embed.append(item_text_dict.get(i, placeholder_text))
+
+        device = torch.device(self.args.device)
+        tokenizer = AutoTokenizer.from_pretrained(self.args.embedding_model_name)
+        model = AutoModel.from_pretrained(self.args.embedding_model_name).to(device)
+
+        embeddings = get_e5_embedding(texts_to_embed, model, tokenizer, device, self.args.embedding_batch_size)
+
+        embedding_path = self._get_preprocessed_folder_path().joinpath('item_embeddings.npy')
+        np.save(embedding_path, embeddings)
+        print(f'Embeddings saved to {embedding_path}')
+
 
     def maybe_download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
-        if folder_path.is_dir() and\
+        if folder_path.is_dir() and \
            all(folder_path.joinpath(filename).is_file() for filename in self.all_raw_file_names()):
             
             print('Raw data already exists. Skip downloading')  
@@ -217,4 +248,3 @@ class AbstractDataset(metaclass=ABCMeta):
         各Datasetクラスで実装する。
         """
         pass
-
