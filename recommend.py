@@ -51,15 +51,12 @@ def recommend():
     dataset_instance = dataset_factory(SimpleNamespace(dataset_code=args.dataset_code, min_rating=args.min_rating, min_uc=args.min_uc, min_sc=args.min_sc, split=args.split, generate_item_embeddings=False))
     preprocessed_data = dataset_instance.load_dataset()
     item_text_dict = preprocessed_data['item_text']
+    idx2item = preprocessed_data['smap_r']
     args.num_items = len(preprocessed_data['smap'])
-    # Create a dummy dataloader to get the dataset object with idx2item mapping
-    dummy_dataloader_args = SimpleNamespace(**vars(args), generate_item_embeddings=False, train_negative_sampler_code='random', train_negative_sample_size=0, train_negative_sampling_seed=0, test_negative_sampler_code='random', test_negative_sample_size=0, test_negative_sampling_seed=0, dataloader_random_seed=0.0, train_batch_size=1, val_batch_size=1, test_batch_size=1)
-    _, _, test_loader = dataloader_factory(dummy_dataloader_args)
-    dataset = test_loader.dataset
 
     # --- Load Trained Model ---
     export_root = Path(args.experiment_dir).joinpath(args.experiment_description)
-    model_path = export_root.joinpath('models', f'model_epoch_{args.epoch_num}.pth')
+    model_path = export_root.joinpath('models', 'best_acc_model.pth')
     if not model_path.exists():
         print(f'Error: Model not found at {model_path}')
         return
@@ -111,32 +108,32 @@ def recommend():
     
     padded_sequence = padded_sequence.unsqueeze(0) # Add batch dimension
 
-    # 6. Get model output (logits)
+    # 6. Get predicted embedding and calculate similarity
     with torch.no_grad():
-        logits = model(padded_sequence)  # B x T x V
-        
-        # Get logits for the MASK token's position
-        mask_logits = logits[0, mask_position, :]
-
-        # Get top_k recommendations
-        top_k_scores, top_k_indices = torch.topk(mask_logits, args.top_k)
-        recommended_item_ids = top_k_indices.tolist()
+        sequence_output = model(padded_sequence)  # B x T x E
+        predicted_embedding = sequence_output[0, mask_position, :] # 1 x E
+        all_item_embeddings = model.item_embeddings # V x E
+        scores = torch.matmul(predicted_embedding, all_item_embeddings.transpose(0, 1)) # 1 x V
+        top_k_scores, top_k_indices = torch.topk(scores, args.top_k)
+        recommended_item_indices = top_k_indices.squeeze().tolist()
 
     # 7. Print results
     print(f'\n--- Recommendations for the sequence: ---')
     for line in input_lines:
         print(f'  - "{line}"')
 
-    recommended_items = []
-    for item_id in recommended_item_ids:
-        if item_id in item_text_dict:
-            recommended_items.append(item_text_dict[item_id])
-        else:
-            recommended_items.append(f'Item ID {item_id} (Unknown)')
-
     print(f'\nTop {args.top_k} recommended items:')
-    for j, item_text in enumerate(recommended_items):
-        print(f'  {j+1}. {item_text}')
+    for j, item_idx in enumerate(recommended_item_indices):
+        if item_idx == 0:
+            # This is a padding item, skip it.
+            continue
+        if item_idx not in idx2item:
+            print(f'  {j+1}. Item index {item_idx} not found in mapping. Skipping.')
+            continue
+
+        original_item_id = idx2item[item_idx]
+        item_text = item_text_dict.get(item_idx, '(Unknown)')
+        print(f'  {j+1}. Item ID {original_item_id} ({item_text})')
 
 if __name__ == '__main__':
     recommend()

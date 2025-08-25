@@ -98,12 +98,29 @@ class AmazonDataset(AbstractDataset):
         file_path = folder_path.joinpath('metadata.json')
         df = pd.read_json(file_path, lines=True)
         
-        # 必要なカラムだけ抽出
-        df = df[['asin', 'description']]
-        df = df.rename(columns={'asin': 'sid', 'description': 'text'})
+        # title と description のみを読み込む
+        required_cols = ['asin', 'title', 'description']
+        available_cols = [col for col in required_cols if col in df.columns]
+        df = df[available_cols]
         
-        # descriptionがリストの場合、最初の要素を取得。それ以外はそのまま。
-        df['text'] = df['text'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x)
+        df = df.rename(columns={'asin': 'sid'})
+        
+        # --- 各フィールドの前処理 ---
+        if 'title' in df.columns:
+            df['title'] = df['title'].fillna('').astype(str)
+        if 'description' in df.columns:
+            df['description'] = df['description'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x).fillna('')
+
+        # --- テキストの結合 ---
+        # titleとdescriptionをスペースで結合
+        df['text'] = df['title'] + ' ' + df['description']
+        
+        # 元のカラムは不要なので削除
+        df = df.drop(columns=[col for col in ['title', 'description'] if col in df.columns])
+
+        # テキストの前後の空白を削除
+        df['text'] = df['text'].str.strip()
+
         # テキストが空、またはNaNの行を削除
         df = df.dropna(subset=['text'])
         df = df[df['text'] != '']
@@ -131,7 +148,7 @@ class AmazonDataset(AbstractDataset):
         # base.pyと同様の前処理を実行
         df = self.make_implicit(ratings_df)
         df = self.filter_triplets(df)
-        df, umap, smap = self.densify_index(df)
+        df, umap, smap, smap_r = self.densify_index(df)
         
         # テキストデータのsidも新しいindexに変換
         text_df['sid'] = text_df['sid'].map(smap)
@@ -149,6 +166,7 @@ class AmazonDataset(AbstractDataset):
                    'test': test,
                    'umap': umap,
                    'smap': smap,
+                   'smap_r': smap_r,
                    'item_text': item_text} # item_text をデータセットに追加
                    
         with dataset_path.open('wb') as f:

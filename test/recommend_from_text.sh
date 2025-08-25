@@ -6,7 +6,7 @@
 DATASET_CODE="amazon"
 EXPERIMENT_DIR="experiments"
 # Use the experiment that was trained with the bertemb model
-EXPERIMENT_DESCRIPTION="bertemb_final_try_2025-08-24_2" 
+EXPERIMENT_DESCRIPTION="bertemb_test_from_script_2025-08-25_3" 
 EPOCH_NUM=200 # The epoch number of the saved model
 
 # --- Model Parameters (must match the training configuration) ---

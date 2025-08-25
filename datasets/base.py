@@ -185,7 +185,7 @@ class AbstractDataset(metaclass=ABCMeta):
         smap = {s: i for i, s in enumerate(set(df['sid']))}
         df['uid'] = df['uid'].map(umap)
         df['sid'] = df['sid'].map(smap)
-        return df, umap, smap
+        return df, umap, smap, {i: s for s, i in smap.items()}
 
     def split_df(self, df, user_count):
         if self.args.split == 'leave_one_out':
