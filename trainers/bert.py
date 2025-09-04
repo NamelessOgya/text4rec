@@ -9,7 +9,7 @@ class BERTTrainer(AbstractTrainer):
     def __init__(self, args, model, train_loader, val_loader, test_loader, export_root):
         super().__init__(args, model, train_loader, val_loader, test_loader, export_root)
         # Use TripletMarginLoss for metric learning, with a margin of 1.0
-        self.loss_fn = nn.TripletMarginLoss(margin=1.0, p=2)
+        self.loss_fn = nn.TripletMarginLoss(margin=0.2, p=2)
 
     @classmethod
     def code(cls):

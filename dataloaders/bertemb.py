@@ -30,7 +30,7 @@ class BertEmbeddingDataloader(AbstractDataloader):
                                                          self.save_folder)
 
         self.train_negative_samples = train_negative_sampler.get_negative_samples()
-        self.test_negative_samples = test_negative_sampler.get_negative_samples()
+        self.test_negative_sampler = test_negative_sampler
 
     @classmethod
     def code(cls):
@@ -67,7 +67,7 @@ class BertEmbeddingDataloader(AbstractDataloader):
 
     def _get_eval_dataset(self, mode):
         answers = self.val if mode == 'val' else self.test
-        dataset = BertEmbeddingEvalDataset(self.train, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_samples, self.item_embeddings, self.embedding_dim)
+        dataset = BertEmbeddingEvalDataset(self.train, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_sampler, self.item_embeddings, self.embedding_dim)
         return dataset
 
 
@@ -136,13 +136,13 @@ class BertEmbeddingTrainDataset(data_utils.Dataset):
 
 
 class BertEmbeddingEvalDataset(data_utils.Dataset):
-    def __init__(self, u2seq, u2answer, max_len, mask_token, negative_samples, item_embeddings, embedding_dim):
+    def __init__(self, u2seq, u2answer, max_len, mask_token, negative_sampler, item_embeddings, embedding_dim):
         self.u2seq = u2seq
         self.users = sorted(self.u2seq.keys())
         self.u2answer = u2answer
         self.max_len = max_len
         self.mask_token = mask_token
-        self.negative_samples = negative_samples
+        self.negative_sampler = negative_sampler
         self.item_embeddings = item_embeddings
         self.embedding_dim = embedding_dim
         self.padding_embedding = torch.zeros(1, self.embedding_dim)
@@ -156,7 +156,7 @@ class BertEmbeddingEvalDataset(data_utils.Dataset):
         user = self.users[index]
         seq_ids = self.u2seq[user]
         answer = self.u2answer[user]
-        negs = self.negative_samples[user]
+        negs = self.negative_sampler.sample_for_user(user)
 
         candidates = answer + negs
         labels = [1] * len(answer) + [0] * len(negs)
