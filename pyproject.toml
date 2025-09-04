@@ -16,6 +16,7 @@ pandas = "^2.3.1"
 scipy = "^1.16.1"
 future = "^1.0.0"
 transformers = "^4.55.4"
+jupyter = "^1.1.1"
 
 
 [build-system]

@@ -2,6 +2,7 @@ from .base import AbstractTrainer
 from .utils import recalls_and_ndcgs_for_ks
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class BERTTrainer(AbstractTrainer):
@@ -38,8 +39,20 @@ class BERTTrainer(AbstractTrainer):
         # Gather the anchor embeddings using the batch and mask indices
         anchor_embeddings = sequence_output[batch_indices, mask_indices]
 
+        # Get the underlying model if using DataParallel
+        model = self.model.module if self.is_parallel else self.model
+        
+        # Project the positive and negative embeddings
+        projected_positive_embeddings = model.projection_layer(positive_embeddings)
+        projected_negative_embeddings = model.projection_layer(negative_embeddings)
+
+        # L2-normalize all embeddings before feeding them to the loss function
+        anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=1)
+        projected_positive_embeddings = F.normalize(projected_positive_embeddings, p=2, dim=1)
+        projected_negative_embeddings = F.normalize(projected_negative_embeddings, p=2, dim=1)
+
         # Calculate the triplet loss
-        loss = self.loss_fn(anchor_embeddings, positive_embeddings, negative_embeddings)
+        loss = self.loss_fn(anchor_embeddings, projected_positive_embeddings, projected_negative_embeddings)
         return loss
 
     def calculate_metrics(self, batch):
@@ -53,13 +66,17 @@ class BERTTrainer(AbstractTrainer):
         # We are interested in the vector for the last item (the one to be predicted)
         last_vector = vectors[:, -1, :]  # B x D
         
-        # Manually compute scores (logits) by taking the dot product with all item embeddings
-        # Note: self.model.item_embeddings is available because the model is BERTEmbeddingModel
-        all_item_embeddings = self.model.item_embeddings
-        if self.is_parallel: # if model is DataParallel
-            all_item_embeddings = self.model.module.item_embeddings
+        # Get the underlying model if using DataParallel
+        model = self.model.module if self.is_parallel else self.model
 
-        logits = torch.matmul(last_vector, all_item_embeddings.transpose(0, 1)) # B x V
+        # Project all item embeddings before calculating scores
+        projected_all_item_embeddings = model.projection_layer(model.item_embeddings)
+
+        # L2-normalize vectors for consistent scoring
+        last_vector = F.normalize(last_vector, p=2, dim=1)
+        projected_all_item_embeddings = F.normalize(projected_all_item_embeddings, p=2, dim=1)
+
+        logits = torch.matmul(last_vector, projected_all_item_embeddings.transpose(0, 1)) # B x V
 
         # Gather the scores for the specific candidates provided for evaluation
         scores = logits.gather(1, candidates)  # B x C

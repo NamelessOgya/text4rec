@@ -24,7 +24,7 @@ poetry run python main.py \
     --experiment_description "bertemb_test_from_script" \
     --device cuda \
     --num_gpu 1 \
-    --min_rating 4 \
+    --min_rating 0 \
     --min_uc 5 \
     --min_sc 0 \
     --split leave_one_out \
@@ -38,7 +38,7 @@ poetry run python main.py \
     --test_negative_sample_size 100 \
     --test_negative_sampling_seed 98765 \
     --optimizer Adam \
-    --lr 0.001 \
+    --lr 0.0001 \
     --enable_lr_schedule \
     --decay_step 25 \
     --gamma 1.0 \
@@ -47,7 +47,7 @@ poetry run python main.py \
     --best_metric "NDCG@10" \
     --model_init_seed 0 \
     --generate_item_embeddings \
-    --item_embedding_path "Data/preprocessed/amazon_min_rating4-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy" \
+    --item_embedding_path "Data/preprocessed/amazon_min_rating0-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy" \
     --bert_dropout 0.1 \
     --bert_hidden_units 1024 \
     --bert_mask_prob 0.15 \

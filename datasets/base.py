@@ -12,6 +12,8 @@ import os
 import tempfile
 import shutil
 import pickle
+from transformers import AutoTokenizer, AutoModel
+
 
 
 class AbstractDataset(metaclass=ABCMeta):
@@ -78,10 +80,14 @@ class AbstractDataset(metaclass=ABCMeta):
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
 
-    def preprocess(self):
-        pass
+    # def preprocess(self):
+    #     pass
         
     def generate_and_save_item_embeddings(self):
+        embedding_path = self._get_preprocessed_folder_path().joinpath('item_embeddings.npy')
+        if embedding_path.is_file():
+            print('Item embeddings already exist. Skipping generation.')
+            return
         print('Generating and saving item embeddings...')
         dataset_path = self._get_preprocessed_dataset_path()
         with open(dataset_path, 'rb') as f:
@@ -106,7 +112,6 @@ class AbstractDataset(metaclass=ABCMeta):
 
         embeddings = get_e5_embedding(texts_to_embed, model, tokenizer, device, self.args.embedding_batch_size)
 
-        embedding_path = self._get_preprocessed_folder_path().joinpath('item_embeddings.npy')
         np.save(embedding_path, embeddings)
         print(f'Embeddings saved to {embedding_path}')
 

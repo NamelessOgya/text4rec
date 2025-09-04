@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import json
+import os
 from abc import *
 from pathlib import Path
 
@@ -85,8 +86,6 @@ class AbstractTrainer(metaclass=ABCMeta):
 
     def train_one_epoch(self, epoch, accum_iter):
         self.model.train()
-        if self.args.enable_lr_schedule:
-            self.lr_scheduler.step()
 
         average_meter_set = AverageMeterSet()
         tqdm_dataloader = tqdm(self.train_loader)
@@ -98,6 +97,8 @@ class AbstractTrainer(metaclass=ABCMeta):
             self.optimizer.zero_grad()
             loss = self.calculate_loss(batch)
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0) # Gradient Clipping
 
             self.optimizer.step()
 
@@ -118,6 +119,9 @@ class AbstractTrainer(metaclass=ABCMeta):
                 self.log_extra_train_info(log_data)
                 self.logger_service.log_train(log_data)
 
+        if self.args.enable_lr_schedule:
+            self.lr_scheduler.step()
+
         return accum_iter
 
     def validate(self, epoch, accum_iter):
@@ -134,7 +138,7 @@ class AbstractTrainer(metaclass=ABCMeta):
 
                 for k, v in metrics.items():
                     average_meter_set.update(k, v)
-                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] +\
+                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] + \
                                       ['Recall@%d' % k for k in self.metric_ks[:3]]
                 description = 'Val: ' + ', '.join(s + ' {:.3f}' for s in description_metrics)
                 description = description.replace('NDCG', 'N').replace('Recall', 'R')
@@ -168,7 +172,7 @@ class AbstractTrainer(metaclass=ABCMeta):
 
                 for k, v in metrics.items():
                     average_meter_set.update(k, v)
-                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] +\
+                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] + \
                                       ['Recall@%d' % k for k in self.metric_ks[:3]]
                 description = 'Val: ' + ', '.join(s + ' {:.3f}' for s in description_metrics)
                 description = description.replace('NDCG', 'N').replace('Recall', 'R')

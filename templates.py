@@ -164,7 +164,7 @@ def set_template(args):
         args.mode = 'train'
         
         args.dataset_code = 'amazon'
-        args.min_rating = 4
+        args.min_rating = 0
         args.min_uc = 5
         args.min_sc = 0
         args.split = 'leave_one_out'

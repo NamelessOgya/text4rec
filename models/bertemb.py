@@ -19,8 +19,8 @@ class BERTEmbeddingModel(BaseModel):
         # To make embeddings trainable or not
         # self.item_embeddings.requires_grad = False # if you want to keep it fixed
 
-        # Add a prediction layer to project transformer output to the same space as item embeddings
-        self.prediction_layer = nn.Linear(args.bert_hidden_units, args.bert_hidden_units)
+        # Add a projection layer to project item embeddings to the same space as transformer output
+        self.projection_layer = nn.Linear(args.bert_hidden_units, args.bert_hidden_units)
 
 
     @classmethod
@@ -30,9 +30,6 @@ class BERTEmbeddingModel(BaseModel):
     def forward(self, x):
         # x is expected to be a sequence of embeddings (batch_size, seq_len, embedding_dim)
         x = self.bert(x)
-        
-        # Project the output of the transformer
-        x_projected = self.prediction_layer(x)
 
-        # Return the sequence of vectors, not the final logits
-        return x_projected
+        # Return the sequence of vectors from BERT, not the final logits
+        return x
