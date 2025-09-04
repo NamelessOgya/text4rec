@@ -11,10 +11,9 @@ import sys
 import ssl
 import urllib.request
 import torch
-from transformers import AutoTokenizer, AutoModel
 
 
-def get_e5_embedding(texts, model, tokenizer, device, batch_size=32, max_length=512):
+def get_e5_embedding(texts, model, tokenizer, device, batch_size=256, max_length=512):
     """
     Generate E5 embeddings for a list of texts.
     Prepends "passage: " to each text for document embedding.
@@ -36,9 +35,11 @@ def get_e5_embedding(texts, model, tokenizer, device, batch_size=32, max_length=
             # Perform average pooling
             embeddings = outputs.last_hidden_state.masked_fill(~inputs['attention_mask'][..., None].bool(), 0.0).sum(dim=1) / inputs['attention_mask'].sum(dim=1)[..., None]
             
-            all_embeddings.append(embeddings.cpu().numpy())
+            # GPU上のテンソルを直接リストに追加
+            all_embeddings.append(embeddings)
 
-    return np.concatenate(all_embeddings, axis=0)
+    # 全てのバッチ処理が終わった後、GPU上でテンソルを結合し、一度だけCPUに転送
+    return torch.cat(all_embeddings, dim=0).cpu().numpy()
 
 
 def download(url, savepath):

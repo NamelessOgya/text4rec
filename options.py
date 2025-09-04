@@ -24,8 +24,8 @@ parser.add_argument('--test_model_path', type=str, default=None)
 # Dataset
 ################
 parser.add_argument('--dataset_code', type=str, default='ml-20m', choices=DATASETS.keys())
-parser.add_argument('--min_rating', type=int, default=4, help='Only keep ratings greater than equal to this value')
-parser.add_argument('--min_uc', type=int, default=5, help='Only keep users with more than min_uc ratings')
+parser.add_argument('--min_rating', type=int, default=3, help='Only keep ratings greater than equal to this value')
+parser.add_argument('--min_uc', type=int, default=3, help='Only keep users with more than min_uc ratings')
 parser.add_argument('--min_sc', type=int, default=0, help='Only keep items with more than min_sc ratings')
 parser.add_argument('--split', type=str, default='leave_one_out', help='How to split the datasets')
 parser.add_argument('--dataset_split_seed', type=int, default=98765)
@@ -67,6 +67,7 @@ parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--weight_decay', type=float, default=0, help='l2 regularization')
 parser.add_argument('--momentum', type=float, default=None, help='SGD momentum')
 # lr scheduler #
+parser.add_argument('--enable_lr_schedule', action='store_true', help='Whether to enable learning rate scheduler.')
 parser.add_argument('--decay_step', type=int, default=15, help='Decay step for StepLR')
 parser.add_argument('--gamma', type=float, default=0.1, help='Gamma for StepLR')
 # epochs #
@@ -75,7 +76,7 @@ parser.add_argument('--num_epochs', type=int, default=100, help='Number of epoch
 parser.add_argument('--log_period_as_iter', type=int, default=12800)
 # evaluation #
 parser.add_argument('--metric_ks', nargs='+', type=int, default=[10, 20, 50], help='ks for Metric@k')
-parser.add_argument('--best_metric', type=str, default='NDCG@10', help='Metric for determining the best model')
+parser.add_argument('--best_metric', type=str, default='NDCQ@10', help='Metric for determining the best model')
 # Finding optimal beta for VAE #
 parser.add_argument('--find_best_beta', type=bool, default=False, 
                     help='If set True, the trainer will anneal beta all the way up to 1.0 and find the best beta')
@@ -92,7 +93,7 @@ parser.add_argument('--model_init_seed', type=int, default=None)
 ################
 parser.add_argument('--generate_item_embeddings', action='store_true', help='Whether to generate item embeddings from text.')
 parser.add_argument('--embedding_model_name', type=str, default='intfloat/multilingual-e5-large', help='Name of the E5 model from Hugging Face.')
-parser.add_argument('--embedding_batch_size', type=int, default=32, help='Batch size for embedding generation.')
+parser.add_argument('--embedding_batch_size', type=int, default=256, help='Batch size for embedding generation.')
 
 # BERT #
 parser.add_argument('--item_embedding_path', type=str, default=None, help='Path to the pre-trained item embeddings .npy file')

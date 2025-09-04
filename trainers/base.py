@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import json
+import os
 from abc import *
 from pathlib import Path
 
@@ -32,6 +33,13 @@ class AbstractTrainer(metaclass=ABCMeta):
         self.num_epochs = args.num_epochs
         self.metric_ks = args.metric_ks
         self.best_metric = args.best_metric
+        print(f'Best metric: {self.best_metric}')
+        # Ensure that the k from best_metric is included in metric_ks
+        if '@' in self.best_metric:
+            k_from_best_metric = int(self.best_metric.split('@')[1])
+            if k_from_best_metric not in self.metric_ks:
+                self.metric_ks.append(k_from_best_metric)
+                self.metric_ks.sort() # Keep it sorted for consistency
 
         self.export_root = export_root
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
@@ -72,13 +80,12 @@ class AbstractTrainer(metaclass=ABCMeta):
             self.validate(epoch, accum_iter)
         self.logger_service.complete({
             'state_dict': (self._create_state_dict()),
+            'epoch': self.num_epochs
         })
         self.writer.close()
 
     def train_one_epoch(self, epoch, accum_iter):
         self.model.train()
-        if self.args.enable_lr_schedule:
-            self.lr_scheduler.step()
 
         average_meter_set = AverageMeterSet()
         tqdm_dataloader = tqdm(self.train_loader)
@@ -90,6 +97,8 @@ class AbstractTrainer(metaclass=ABCMeta):
             self.optimizer.zero_grad()
             loss = self.calculate_loss(batch)
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0) # Gradient Clipping
 
             self.optimizer.step()
 
@@ -110,6 +119,9 @@ class AbstractTrainer(metaclass=ABCMeta):
                 self.log_extra_train_info(log_data)
                 self.logger_service.log_train(log_data)
 
+        if self.args.enable_lr_schedule:
+            self.lr_scheduler.step()
+
         return accum_iter
 
     def validate(self, epoch, accum_iter):
@@ -126,7 +138,7 @@ class AbstractTrainer(metaclass=ABCMeta):
 
                 for k, v in metrics.items():
                     average_meter_set.update(k, v)
-                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] +\
+                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] + \
                                       ['Recall@%d' % k for k in self.metric_ks[:3]]
                 description = 'Val: ' + ', '.join(s + ' {:.3f}' for s in description_metrics)
                 description = description.replace('NDCG', 'N').replace('Recall', 'R')
@@ -160,7 +172,7 @@ class AbstractTrainer(metaclass=ABCMeta):
 
                 for k, v in metrics.items():
                     average_meter_set.update(k, v)
-                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] +\
+                description_metrics = ['NDCG@%d' % k for k in self.metric_ks[:3]] + \
                                       ['Recall@%d' % k for k in self.metric_ks[:3]]
                 description = 'Val: ' + ', '.join(s + ' {:.3f}' for s in description_metrics)
                 description = description.replace('NDCG', 'N').replace('Recall', 'R')
@@ -199,6 +211,7 @@ class AbstractTrainer(metaclass=ABCMeta):
                 MetricGraphPrinter(writer, key='Recall@%d' % k, graph_name='Recall@%d' % k, group_name='Validation'))
         val_loggers.append(RecentModelLogger(model_checkpoint))
         val_loggers.append(BestModelLogger(model_checkpoint, metric_key=self.best_metric))
+        # val_loggers.append(EpochModelLogger(model_checkpoint)) # Disabled to save storage
         return writer, train_loggers, val_loggers
 
     def _create_state_dict(self):

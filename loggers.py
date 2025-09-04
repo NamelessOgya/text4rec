@@ -8,16 +8,19 @@ def save_state_dict(state_dict, path, filename):
     torch.save(state_dict, os.path.join(path, filename))
 
 
-class LoggerService(object):
-    def __init__(self, train_loggers=None, val_loggers=None):
-        self.train_loggers = train_loggers if train_loggers else []
-        self.val_loggers = val_loggers if val_loggers else []
+class AbstractBaseLogger(metaclass=ABCMeta):
+    @abstractmethod
+    def log(self, *args, **kwargs):
+        raise NotImplementedError
 
-    def complete(self, log_data):
-        for logger in self.train_loggers:
-            logger.complete(**log_data)
-        for logger in self.val_loggers:
-            logger.complete(**log_data)
+    def complete(self, *args, **kwargs):
+        pass
+
+
+class LoggerService:
+    def __init__(self, train_loggers, val_loggers):
+        self.train_loggers = train_loggers
+        self.val_loggers = val_loggers
 
     def log_train(self, log_data):
         for logger in self.train_loggers:
@@ -27,14 +30,23 @@ class LoggerService(object):
         for logger in self.val_loggers:
             logger.log(**log_data)
 
+    def complete(self, log_data):
+        for logger in self.train_loggers:
+            if isinstance(logger, RecentModelLogger) or isinstance(logger, BestModelLogger) or isinstance(logger, EpochModelLogger):
+                logger.log(**log_data)
+        for logger in self.val_loggers:
+            if isinstance(logger, RecentModelLogger) or isinstance(logger, BestModelLogger) or isinstance(logger, EpochModelLogger):
+                logger.log(**log_data)
 
-class AbstractBaseLogger(metaclass=ABCMeta):
-    @abstractmethod
+
+class EpochModelLogger(AbstractBaseLogger):
+    def __init__(self, model_checkpoint_root):
+        self.model_checkpoint_root = model_checkpoint_root
+
     def log(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def complete(self, *args, **kwargs):
-        pass
+        state_dict = kwargs['state_dict']
+        epoch = kwargs['epoch']
+        torch.save(state_dict, os.path.join(self.model_checkpoint_root, f'model_epoch_{epoch}.pth'))
 
 
 class RecentModelLogger(AbstractBaseLogger):
@@ -69,11 +81,14 @@ class BestModelLogger(AbstractBaseLogger):
         self.filename = filename
 
     def log(self, *args, **kwargs):
-        current_metric = kwargs[self.metric_key]
-        if self.best_metric < current_metric:
-            print("Update Best {} Model at {}".format(self.metric_key, kwargs['epoch']))
-            self.best_metric = current_metric
-            save_state_dict(kwargs['state_dict'], self.checkpoint_path, self.filename)
+        if self.metric_key not in kwargs:
+            pass
+        else:
+            current_metric = kwargs[self.metric_key]
+            if self.best_metric < current_metric:
+                print("Update Best {} Model at {}".format(self.metric_key, kwargs['epoch']))
+                self.best_metric = current_metric
+                save_state_dict(kwargs['state_dict'], self.checkpoint_path, self.filename)
 
 
 class MetricGraphPrinter(AbstractBaseLogger):
@@ -84,10 +99,12 @@ class MetricGraphPrinter(AbstractBaseLogger):
         self.writer = writer
 
     def log(self, *args, **kwargs):
-        if self.key in kwargs:
+        # Removed debug print and simplified logic based on the fix in LoggerService
+        if self.key in kwargs and 'accum_iter' in kwargs:
             self.writer.add_scalar(self.group_name + '/' + self.graph_label, kwargs[self.key], kwargs['accum_iter'])
-        else:
+        elif 'accum_iter' in kwargs: # If key is not in kwargs, but accum_iter is, log 0
             self.writer.add_scalar(self.group_name + '/' + self.graph_label, 0, kwargs['accum_iter'])
+        # No else needed, if accum_iter is also missing, we just don't log for this MetricGraphPrinter
 
     def complete(self, *args, **kwargs):
         self.writer.close()
