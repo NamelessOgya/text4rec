@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # This script tests the training process for the BERTEmbeddingModel (bertemb).
+
 echo "=== Test training for BERTEmbeddingModel using Amazon dataset ==="
 
 read -p "This will delete ./Data/amazon and ./Data/preprocessed. Continue? (y/n): " -n 1 answer
@@ -38,7 +39,7 @@ poetry run python main.py \
     --test_negative_sample_size 100 \
     --test_negative_sampling_seed 98765 \
     --optimizer Adam \
-    --lr 0.0001 \
+    --lr 0.00001 \
     --enable_lr_schedule \
     --decay_step 25 \
     --gamma 1.0 \
@@ -50,6 +51,8 @@ poetry run python main.py \
     --item_embedding_path "Data/preprocessed/amazon_min_rating0-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy" \
     --bert_dropout 0.1 \
     --bert_hidden_units 1024 \
+    --projection_mlp_dims 512 256 \
+    --projection_dropout 0.1 \
     --bert_mask_prob 0.15 \
     --bert_max_len 100 \
     --bert_num_blocks 2 \
