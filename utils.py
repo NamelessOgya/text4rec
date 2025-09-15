@@ -24,13 +24,22 @@ def setup_train(args):
 
 
 def create_experiment_export_folder(args):
-    experiment_dir, experiment_description = args.experiment_dir, args.experiment_description
-    if not os.path.exists(experiment_dir):
-        os.mkdir(experiment_dir)
-    experiment_path = get_name_of_experiment_path(experiment_dir, experiment_description)
-    os.mkdir(experiment_path)
-    print('Folder created: ' + os.path.abspath(experiment_path))
-    return experiment_path
+    if not os.path.exists('current_run.yaml'):
+        raise FileNotFoundError("'current_run.yaml' not found. Please run experiments using 'sandbox/run_and_log.sh'")
+
+    with open('current_run.yaml', 'r') as f:
+        line = f.readline()
+        nichika_run_id = line.split(':')[1].strip()
+
+    export_root = os.path.join('result', f'training_{nichika_run_id}')
+
+    if not os.path.exists('result'):
+        os.mkdir('result')
+    if not os.path.exists(export_root):
+        os.mkdir(export_root)
+
+    print('Folder created: ' + os.path.abspath(export_root))
+    return export_root
 
 
 def get_name_of_experiment_path(experiment_dir, experiment_description):

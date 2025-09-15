@@ -1,4 +1,5 @@
-from templates import set_template
+import os
+import yaml
 from datasets import DATASETS
 from dataloaders import DATALOADERS
 from models import MODELS
@@ -13,7 +14,6 @@ parser = argparse.ArgumentParser(description='RecPlay')
 # Top Level
 ################
 parser.add_argument('--mode', type=str, default='train', choices=['train'])
-parser.add_argument('--template', type=str, default=None)
 
 ################
 # Test
@@ -127,5 +127,11 @@ parser.add_argument('--experiment_description', type=str, default='test')
 
 
 ################
+# Load parameters from YAML
+params_file = os.environ.get('PARAMS_FILE', 'params/default.yaml')
+if os.path.exists(params_file):
+    with open(params_file, 'r') as f:
+        params = yaml.safe_load(f)
+    parser.set_defaults(**params)
+
 args = parser.parse_args()
-set_template(args)
