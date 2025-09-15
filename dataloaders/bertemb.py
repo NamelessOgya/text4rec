@@ -15,6 +15,7 @@ class BertEmbeddingDataloader(AbstractDataloader):
         self.item_embeddings = torch.from_numpy(np.load(args.item_embedding_path)).float()
         self.embedding_dim = self.item_embeddings.shape[1]
         self.CLOZE_MASK_TOKEN = self.item_count + 1
+        self.mask_embedding = torch.randn(1, self.embedding_dim) * 0.01
 
         code = args.train_negative_sampler_code
         train_negative_sampler = negative_sampler_factory(code, self.train, self.val, self.test,
@@ -49,7 +50,7 @@ class BertEmbeddingDataloader(AbstractDataloader):
         return dataloader
 
     def _get_train_dataset(self):
-        dataset = BertEmbeddingTrainDataset(self.train, self.max_len, self.mask_prob, self.item_count, self.rng, self.item_embeddings, self.embedding_dim)
+        dataset = BertEmbeddingTrainDataset(self.train, self.max_len, self.mask_prob, self.item_count, self.rng, self.item_embeddings, self.embedding_dim, self.mask_embedding)
         return dataset
 
     def _get_val_loader(self):
@@ -67,12 +68,26 @@ class BertEmbeddingDataloader(AbstractDataloader):
 
     def _get_eval_dataset(self, mode):
         answers = self.val if mode == 'val' else self.test
-        dataset = BertEmbeddingEvalDataset(self.train, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_sampler, self.item_embeddings, self.embedding_dim)
+        
+        if mode == 'val':
+            # For validation, use the training sequence as input
+            input_seqs = self.train
+        else:  # mode == 'test'
+            # For testing, use the training sequence + validation item as input
+            input_seqs = {}
+            for user in self.train:
+                # Ensure the user exists in val set, though it should with leave-one-out
+                if user in self.val:
+                    input_seqs[user] = self.train[user] + self.val[user]
+                else:
+                    input_seqs[user] = self.train[user]
+
+        dataset = BertEmbeddingEvalDataset(input_seqs, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_sampler, self.item_embeddings, self.embedding_dim, self.mask_embedding)
         return dataset
 
 
 class BertEmbeddingTrainDataset(data_utils.Dataset):
-    def __init__(self, u2seq, max_len, mask_prob, num_items, rng, item_embeddings, embedding_dim):
+    def __init__(self, u2seq, max_len, mask_prob, num_items, rng, item_embeddings, embedding_dim, mask_embedding):
         self.u2seq = u2seq
         self.users = sorted(self.u2seq.keys())
         self.max_len = max_len
@@ -82,7 +97,7 @@ class BertEmbeddingTrainDataset(data_utils.Dataset):
         self.item_embeddings = item_embeddings
         self.embedding_dim = embedding_dim
         self.padding_embedding = torch.zeros(1, self.embedding_dim)
-        self.mask_embedding = torch.zeros(1, self.embedding_dim) # A specific embedding for the MASK token
+        self.mask_embedding = mask_embedding
         self.embeddings_with_padding = torch.cat((self.padding_embedding, self.item_embeddings), 0)
 
     def __len__(self):
@@ -106,19 +121,13 @@ class BertEmbeddingTrainDataset(data_utils.Dataset):
         positive_id = seq[mask_idx]
         positive_embedding = self.embeddings_with_padding[positive_id]
 
-        # 3. Sample a negative item ID and get its embedding
-        negative_id = self.rng.randint(1, self.num_items)
-        while negative_id == positive_id:
-            negative_id = self.rng.randint(1, self.num_items)
-        negative_embedding = self.embeddings_with_padding[negative_id]
-
-        # 4. Create the masked input sequence of embeddings
+        # 3. Create the masked input sequence of embeddings
         input_embeddings = []
         for i, item_id in enumerate(seq):
             embedding = self.mask_embedding if i == mask_idx else self.embeddings_with_padding[item_id].unsqueeze(0)
             input_embeddings.append(embedding)
 
-        # 5. Pad the sequence of embeddings
+        # 4. Pad the sequence of embeddings
         input_embeddings = input_embeddings[-self.max_len:]
         padding_len = self.max_len - len(input_embeddings)
         input_embeddings = [self.padding_embedding] * padding_len + input_embeddings
@@ -128,7 +137,9 @@ class BertEmbeddingTrainDataset(data_utils.Dataset):
         # The mask position needs to be adjusted for padding
         final_mask_idx = mask_idx + padding_len
 
-        return input_tensor, positive_embedding, negative_embedding, torch.LongTensor([final_mask_idx])
+        # For InfoNCE, we only need the anchor (derived from input_tensor and mask_idx) 
+        # and the positive embedding. The negative embeddings will be sourced from within the batch.
+        return input_tensor, positive_embedding, torch.LongTensor([final_mask_idx])
 
     def _getseq(self, user):
         return self.u2seq[user]
@@ -136,7 +147,7 @@ class BertEmbeddingTrainDataset(data_utils.Dataset):
 
 
 class BertEmbeddingEvalDataset(data_utils.Dataset):
-    def __init__(self, u2seq, u2answer, max_len, mask_token, negative_sampler, item_embeddings, embedding_dim):
+    def __init__(self, u2seq, u2answer, max_len, mask_token, negative_sampler, item_embeddings, embedding_dim, mask_embedding):
         self.u2seq = u2seq
         self.users = sorted(self.u2seq.keys())
         self.u2answer = u2answer
@@ -146,7 +157,7 @@ class BertEmbeddingEvalDataset(data_utils.Dataset):
         self.item_embeddings = item_embeddings
         self.embedding_dim = embedding_dim
         self.padding_embedding = torch.zeros(1, self.embedding_dim)
-        self.mask_embedding = torch.zeros(1, self.embedding_dim)
+        self.mask_embedding = mask_embedding
         self.embeddings_with_padding = torch.cat((self.padding_embedding, self.item_embeddings), 0)
 
     def __len__(self):

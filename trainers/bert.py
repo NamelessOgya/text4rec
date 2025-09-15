@@ -8,8 +8,9 @@ import torch.nn.functional as F
 class BERTTrainer(AbstractTrainer):
     def __init__(self, args, model, train_loader, val_loader, test_loader, export_root):
         super().__init__(args, model, train_loader, val_loader, test_loader, export_root)
-        # Use TripletMarginLoss for metric learning, with a margin of 1.0
-        self.loss_fn = nn.TripletMarginLoss(margin=0.2, p=2)
+        # Define loss function for InfoNCE
+        self.temperature = 0.07  # Temperature for scaling logits
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)
 
     @classmethod
     def code(cls):
@@ -25,61 +26,66 @@ class BERTTrainer(AbstractTrainer):
         pass
 
     def calculate_loss(self, batch):
-        # Unpack the batch from the new dataloader for triplet loss
-        input_sequences, positive_embeddings, negative_embeddings, mask_indices = batch
-        
-        # The model's forward pass returns the transformer's output for the whole sequence
-        sequence_output = self.model(input_sequences)  # B x T x D
-
-        # Extract the anchor embedding at the masked position for each sequence in the batch
-        # mask_indices is B x 1, needs to be squeezed to use with torch.arange
-        mask_indices = mask_indices.squeeze()
-        # Create an index for the batch dimension
-        batch_indices = torch.arange(sequence_output.size(0), device=sequence_output.device)
-        # Gather the anchor embeddings using the batch and mask indices
-        anchor_embeddings = sequence_output[batch_indices, mask_indices]
-
-        # Get the underlying model if using DataParallel
         model = self.model.module if self.is_parallel else self.model
-        
-        # Project the positive and negative embeddings
-        projected_positive_embeddings = model.projection_layer(positive_embeddings)
-        projected_negative_embeddings = model.projection_layer(negative_embeddings)
+        if hasattr(model, 'projection_layer'):
+            # Unpack the batch from the metric learning dataloader
+            input_sequences, positive_embeddings, mask_indices = batch
+            
+            # The model's forward pass returns the transformer's output for the whole sequence
+            sequence_output = self.model(input_sequences)  # B x T x D
 
-        # L2-normalize all embeddings before feeding them to the loss function
-        anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=1)
-        projected_positive_embeddings = F.normalize(projected_positive_embeddings, p=2, dim=1)
-        projected_negative_embeddings = F.normalize(projected_negative_embeddings, p=2, dim=1)
+            # Extract the anchor embedding at the masked position
+            mask_indices = mask_indices.squeeze()
+            batch_indices = torch.arange(sequence_output.size(0), device=sequence_output.device)
+            anchor_embeddings = sequence_output[batch_indices, mask_indices]
+            
+            # Project the positive embeddings
+            projected_positive_embeddings = model.projection_layer(positive_embeddings)
 
-        # Calculate the triplet loss
-        loss = self.loss_fn(anchor_embeddings, projected_positive_embeddings, projected_negative_embeddings)
-        return loss
+            # L2-normalize all embeddings
+            anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=1)
+            projected_positive_embeddings = F.normalize(projected_positive_embeddings, p=2, dim=1)
+
+            # InfoNCE loss using in-batch negatives
+            sim_matrix = torch.matmul(anchor_embeddings, projected_positive_embeddings.t()) / self.temperature
+            
+            labels = torch.arange(sim_matrix.size(0), device=sim_matrix.device)
+
+            loss = self.loss_fn(sim_matrix, labels)
+            return loss
+        else:
+            seqs, labels = batch
+            logits = self.model(seqs) # B x T x V
+            
+            logits = logits.view(-1, logits.size(-1)) # (B*T) x V
+            labels = labels.view(-1) # B*T
+            
+            loss = self.loss_fn(logits, labels)
+            return loss
 
     def calculate_metrics(self, batch):
-        # The evaluation logic remains the same as it uses the evaluation dataloader
-        # which provides pre-defined candidates and labels for ranking metrics.
-        seqs, candidates, labels = batch
-        
-        # The model's forward pass returns a sequence of vectors
-        vectors = self.model(seqs)  # B x T x D
-        
-        # We are interested in the vector for the last item (the one to be predicted)
-        last_vector = vectors[:, -1, :]  # B x D
-        
-        # Get the underlying model if using DataParallel
         model = self.model.module if self.is_parallel else self.model
+        if hasattr(model, 'projection_layer'):
+            seqs, candidates, labels = batch
+            vectors = self.model(seqs)
+            last_vector = vectors[:, -1, :]
+            
+            projected_all_item_embeddings = model.projection_layer(model.item_embeddings)
 
-        # Project all item embeddings before calculating scores
-        projected_all_item_embeddings = model.projection_layer(model.item_embeddings)
+            last_vector = F.normalize(last_vector, p=2, dim=1)
+            projected_all_item_embeddings = F.normalize(projected_all_item_embeddings, p=2, dim=1)
 
-        # L2-normalize vectors for consistent scoring
-        last_vector = F.normalize(last_vector, p=2, dim=1)
-        projected_all_item_embeddings = F.normalize(projected_all_item_embeddings, p=2, dim=1)
+            logits = torch.matmul(last_vector, projected_all_item_embeddings.transpose(0, 1))
+            scores = logits.gather(1, candidates)
 
-        logits = torch.matmul(last_vector, projected_all_item_embeddings.transpose(0, 1)) # B x V
-
-        # Gather the scores for the specific candidates provided for evaluation
-        scores = logits.gather(1, candidates)  # B x C
-
-        metrics = recalls_and_ndcgs_for_ks(scores, labels, self.metric_ks)
-        return metrics
+            metrics = recalls_and_ndcgs_for_ks(scores, labels, self.metric_ks)
+            return metrics
+        else:
+            seqs, candidates, labels = batch
+            logits = self.model(seqs)
+            
+            last_logits = logits[:, -1, :] # B x V
+            scores = last_logits.gather(1, candidates) # B x C
+            
+            metrics = recalls_and_ndcgs_for_ks(scores, labels, self.metric_ks)
+            return metrics

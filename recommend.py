@@ -32,6 +32,7 @@ def recommend():
 
     # --- Arguments needed for model/dataloader initialization (must match training) ---
     parser.add_argument('--bert_hidden_units', type=int, required=True, help='Size of hidden vectors (d_model)')
+    parser.add_argument('--retrieval_embedding_dim', type=int, default=None, help='Dimension of the final embedding for retrieval. Defaults to bert_hidden_units.')
     parser.add_argument('--bert_num_blocks', type=int, required=True, help='Number of transformer layers')
     parser.add_argument('--bert_num_heads', type=int, required=True, help='Number of heads for multi-attention')
     parser.add_argument('--bert_dropout', type=float, required=True, help='Dropout probability')
@@ -112,7 +113,7 @@ def recommend():
     with torch.no_grad():
         sequence_output = model(padded_sequence)  # B x T x E
         predicted_embedding = sequence_output[0, mask_position, :] # 1 x E
-        all_item_embeddings = model.item_embeddings # V x E
+        all_item_embeddings = model.projection_layer(model.item_embeddings) # V x E
         scores = torch.matmul(predicted_embedding, all_item_embeddings.transpose(0, 1)) # 1 x V
         top_k_scores, top_k_indices = torch.topk(scores, args.top_k)
         recommended_item_indices = top_k_indices.squeeze().tolist()

@@ -100,6 +100,8 @@ parser.add_argument('--item_embedding_path', type=str, default=None, help='Path 
 parser.add_argument('--bert_max_len', type=int, default=None, help='Length of sequence for bert')
 parser.add_argument('--bert_num_items', type=int, default=None, help='Number of total items')
 parser.add_argument('--bert_hidden_units', type=int, default=None, help='Size of hidden vectors (d_model). Must match embedding dim for ID-Free model.')
+parser.add_argument('--projection_mlp_dims', nargs='+', type=int, default=None, help='Dimensions of the projection MLP. e.g., 512 256')
+parser.add_argument('--projection_dropout', type=float, default=0.1, help='Dropout rate for the projection MLP.')
 parser.add_argument('--bert_num_blocks', type=int, default=None, help='Number of transformer layers')
 parser.add_argument('--bert_num_heads', type=int, default=None, help='Number of heads for multi-attention')
 parser.add_argument('--bert_dropout', type=float, default=None, help='Dropout probability to use throughout the model')
