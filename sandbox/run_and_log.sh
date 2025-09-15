@@ -34,13 +34,10 @@ timestamp=$(date +%Y%m%d%H%M%S)
 nichika_run_id="exp_${timestamp}"
 echo "nichika_run_id: ${nichika_run_id}" > current_run.yaml
 
-# 3. Run emb_b4r.sh
+# 3. Run the training
 echo "Starting experiment ${nichika_run_id}..."
 
-# Note: emb_b4r.sh has an interactive prompt. 
-# To run this script in a fully automated way, you might need to modify emb_b4r.sh 
-# or pipe `yes` to it, like: yes | ./test/emb_b4r.sh
-./test/emb_b4r.sh
+poetry run python main.py
 
 # 4. The result saving is handled by the python script.
 # The python script is modified to read current_run.yaml and save the results
