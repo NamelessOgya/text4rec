@@ -9,8 +9,12 @@ class BERTEmbeddingModel(BaseModel):
     def __init__(self, args):
         super().__init__(args)
 
+        # Load pre-trained item embeddings to determine their dimension
+        item_embeddings = torch.from_numpy(np.load(args.item_embedding_path)).float()
+        embedding_dim = item_embeddings.size(1)
+
         self.pre_bert_mlp = nn.Sequential(
-            nn.Linear(args.bert_hidden_units, args.bert_hidden_units),
+            nn.Linear(embedding_dim, args.bert_hidden_units),
             nn.ReLU(),
             nn.Linear(args.bert_hidden_units, args.bert_hidden_units)
         )
@@ -35,10 +39,7 @@ class BERTEmbeddingModel(BaseModel):
             # Fallback to identity if no MLP is defined
             self.retrieval_projection = nn.Identity()
 
-        # Load pre-trained item embeddings
-        item_embeddings = torch.from_numpy(np.load(args.item_embedding_path)).float()
-        
-        padding_embedding = torch.zeros(1, item_embeddings.size(1))
+        padding_embedding = torch.zeros(1, embedding_dim)
         self.item_embeddings = nn.Parameter(torch.cat([padding_embedding, item_embeddings], dim=0))
 
         # Projection for item ID embeddings: mlp -> retrieval_projection

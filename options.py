@@ -1,4 +1,5 @@
-from templates import set_template
+import os
+import yaml
 from datasets import DATASETS
 from dataloaders import DATALOADERS
 from models import MODELS
@@ -13,7 +14,6 @@ parser = argparse.ArgumentParser(description='RecPlay')
 # Top Level
 ################
 parser.add_argument('--mode', type=str, default='train', choices=['train'])
-parser.add_argument('--template', type=str, default=None)
 
 ################
 # Test
@@ -31,6 +31,7 @@ parser.add_argument('--split', type=str, default='leave_one_out', help='How to s
 parser.add_argument('--dataset_split_seed', type=int, default=98765)
 parser.add_argument('--eval_set_size', type=int, default=500, 
                     help='Size of val and test set. 500 for ML-1m and 10000 for ML-20m recommended')
+parser.add_argument('--recreate_data', action='store_true', help='If set, delete and recreate preprocessed data.')
 
 ################
 # Dataloader
@@ -127,5 +128,11 @@ parser.add_argument('--experiment_description', type=str, default='test')
 
 
 ################
+# Load parameters from YAML
+params_file = os.environ.get('PARAMS_FILE', 'params/default.yaml')
+if os.path.exists(params_file):
+    with open(params_file, 'r') as f:
+        params = yaml.safe_load(f)
+    parser.set_defaults(**params)
+
 args = parser.parse_args()
-set_template(args)
