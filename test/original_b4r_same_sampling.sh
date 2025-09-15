@@ -40,11 +40,11 @@ poetry run python main.py \
     --test_negative_sample_size 100 \
     --test_negative_sampling_seed 98765 \
     --optimizer Adam \
-    --lr 0.00001 \
+    --lr 0.001 \
     --enable_lr_schedule \
-    --decay_step 25 \
-    --gamma 1.0 \
-    --num_epochs 1200 \
+    --decay_step 30 \
+    --gamma 0.1 \
+    --num_epochs 200 \
     --metric_ks 1 5 10 20 50 100 \
     --best_metric "NDCG@10" \
     --model_init_seed 0 \

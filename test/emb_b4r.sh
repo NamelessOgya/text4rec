@@ -43,7 +43,7 @@ poetry run python main.py \
     --enable_lr_schedule \
     --decay_step 25 \
     --gamma 1.0 \
-    --num_epochs 1200 \
+    --num_epochs 200 \
     --metric_ks 1 5 10 20 50 100 \
     --best_metric "NDCG@10" \
     --model_init_seed 0 \

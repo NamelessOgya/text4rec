@@ -10,7 +10,7 @@ class BERTTrainer(AbstractTrainer):
         super().__init__(args, model, train_loader, val_loader, test_loader, export_root)
         # Define loss function for InfoNCE
         self.temperature = 0.07  # Temperature for scaling logits
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)
 
     @classmethod
     def code(cls):
