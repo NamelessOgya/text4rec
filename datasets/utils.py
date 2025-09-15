@@ -10,6 +10,36 @@ import shutil
 import sys
 import ssl
 import urllib.request
+import torch
+
+
+def get_e5_embedding(texts, model, tokenizer, device, batch_size=256, max_length=512):
+    """
+    Generate E5 embeddings for a list of texts.
+    Prepends "passage: " to each text for document embedding.
+    """
+    all_embeddings = []
+    model.eval()
+    
+    # Add prefix for passage embedding
+    prefixed_texts = ["passage: " + str(text) for text in texts]
+
+    with torch.no_grad():
+        for i in tqdm(range(0, len(prefixed_texts), batch_size), desc="Generating Embeddings"):
+            batch_texts = prefixed_texts[i:i+batch_size]
+            
+            inputs = tokenizer(batch_texts, max_length=max_length, padding=True, truncation=True, return_tensors='pt').to(device)
+            
+            outputs = model(**inputs)
+            
+            # Perform average pooling
+            embeddings = outputs.last_hidden_state.masked_fill(~inputs['attention_mask'][..., None].bool(), 0.0).sum(dim=1) / inputs['attention_mask'].sum(dim=1)[..., None]
+            
+            # GPU上のテンソルを直接リストに追加
+            all_embeddings.append(embeddings)
+
+    # 全てのバッチ処理が終わった後、GPU上でテンソルを結合し、一度だけCPUに転送
+    return torch.cat(all_embeddings, dim=0).cpu().numpy()
 
 
 def download(url, savepath):
@@ -50,4 +80,3 @@ def filter_triplets(tp, min_uc=5, min_sc=0):
     # Update both usercount and itemcount after filtering
     usercount, itemcount = get_count(tp, 'userId'), get_count(tp, 'movieId')
     return tp, usercount, itemcount
-
