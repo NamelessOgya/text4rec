@@ -31,6 +31,7 @@ parser.add_argument('--split', type=str, default='leave_one_out', help='How to s
 parser.add_argument('--dataset_split_seed', type=int, default=98765)
 parser.add_argument('--eval_set_size', type=int, default=500, 
                     help='Size of val and test set. 500 for ML-1m and 10000 for ML-20m recommended')
+parser.add_argument('--recreate_data', action='store_true', help='If set, delete and recreate preprocessed data.')
 
 ################
 # Dataloader

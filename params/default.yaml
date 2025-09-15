@@ -27,7 +27,7 @@ lr: 0.001
 enable_lr_schedule: true
 decay_step: 25
 gamma: 1.0
-num_epochs: 200
+num_epochs: 2
 metric_ks: [1, 5, 10, 20, 50, 100]
 best_metric: NDCG@10
 
@@ -41,9 +41,12 @@ bert_max_len: 100
 bert_num_blocks: 2
 bert_num_heads: 4
 
+do_test: true
+
 # Parameters from emb_b4r.sh
 experiment_description: "bertemb_test_from_script"
 generate_item_embeddings: true
 item_embedding_path: "Data/preprocessed/amazon_min_rating0-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy"
 projection_mlp_dims: [512, 256]
 projection_dropout: 0.1
+recreate_data: false
