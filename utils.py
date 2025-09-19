@@ -6,6 +6,7 @@ import pprint as pp
 import random
 from datetime import date
 from pathlib import Path
+import yaml
 
 import numpy as np
 import torch
@@ -67,8 +68,24 @@ def save_test_result(export_root, result):
 
 
 def export_experiments_config_as_json(args, experiment_path):
+    # Get the YAML file path from environment variable
+    params_file = os.environ.get('PARAMS_FILE', 'params/default.yaml')
+    if os.path.exists(params_file):
+        with open(params_file, 'r') as f:
+            yaml_params = yaml.safe_load(f)
+    else:
+        yaml_params = {}
+
+    # Convert the argparse Namespace to a dict
+    args_dict = vars(args)
+
+    # Merge the two: start with YAML, override with argparse args
+    final_config = yaml_params.copy()
+    final_config.update(args_dict)
+
+    # Save the final, merged configuration
     with open(os.path.join(experiment_path, 'config.json'), 'w') as outfile:
-        json.dump(vars(args), outfile, indent=2)
+        json.dump(final_config, outfile, indent=2)
 
 
 def fix_random_seed_as(random_seed):

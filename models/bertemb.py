@@ -51,7 +51,11 @@ class BERTEmbeddingModel(BaseModel):
         return 'bert_embedding'
 
     def forward(self, x):
-        # x is expected to be a sequence of embeddings (batch_size, seq_len, embedding_dim)
+        # If the input is a LongTensor of item IDs, look up the embeddings
+        if x.dtype == torch.long:
+            x = self.item_embeddings[x] # Convert IDs to embeddings
+
+        # x is now a sequence of embeddings (batch_size, seq_len, embedding_dim)
         x = self.pre_bert_mlp(x)
         x = self.bert(x)
         x = self.retrieval_projection(x)

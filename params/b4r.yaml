@@ -1,8 +1,16 @@
 mode: train
 dataset_code: amazon
+
+amazon_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/AMAZON_FASHION.json.gz
+# amazon_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/Movies_and_TV.json.gz
+amazon_metadata_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_AMAZON_FASHION.json.gz
+# amazon_metadata_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_Movies_and_TV.json.gz
+
 model_code: bert
 dataloader_code: bert
 trainer_code: bert
+use_hard_negative_mining: false
+use_prefix_augmentation: false
 experiment_description: "bert_test_from_script"
 device: cuda
 num_gpu: 1
@@ -24,7 +32,7 @@ lr: 0.001
 enable_lr_schedule: true
 decay_step: 30
 gamma: 0.1
-num_epochs: 2
+num_epochs: 200
 metric_ks: [1, 5, 10, 20, 50, 100]
 best_metric: "NDCG@10"
 model_init_seed: 0
