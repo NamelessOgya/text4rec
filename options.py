@@ -62,6 +62,10 @@ parser.add_argument('--test_negative_sampling_seed', type=int, default=None)
 ################
 parser.add_argument('--trainer_code', type=str, default='bert', choices=TRAINERS.keys())
 parser.add_argument('--use_hard_negative_mining', action='store_true', help='Whether to use hard negative mining in InfoNCE loss')
+parser.add_argument('--use_curriculum_learning', action='store_true', help='Whether to use curriculum learning for hard negative mining.')
+parser.add_argument('--hard_negative_curriculum_k_initial', type=int, default=1, help='Initial number of hard negatives for curriculum learning.')
+parser.add_argument('--hard_negative_curriculum_k_final', type=int, default=10, help='Final number of hard negatives for curriculum learning.')
+parser.add_argument('--hard_negative_curriculum_total_epochs', type=int, default=50, help='Total epochs for curriculum learning schedule.')
 parser.add_argument('--loss_type', type=str, default='infonce', choices=['infonce', 'bce', 'gbce'], help='Type of loss function to use.')
 parser.add_argument('--gbce_q', type=float, default=0.5, help='The q parameter for gBCE loss.')
 # device #

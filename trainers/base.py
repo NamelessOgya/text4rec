@@ -84,6 +84,7 @@ class AbstractTrainer(metaclass=ABCMeta):
         self.writer.close()
 
     def train_one_epoch(self, epoch, accum_iter):
+        self.epoch = epoch
         self.model.train()
         average_meter_set = AverageMeterSet()
         tqdm_dataloader = tqdm(self.train_loader)

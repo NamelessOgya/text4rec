@@ -27,11 +27,8 @@ class BERTTrainer(AbstractTrainer):
     def calculate_loss(self, batch):
         model = self.model.module if self.is_parallel else self.model
         if hasattr(model, 'projection_layer'):
-            if len(batch) == 4:
-                input_sequences, positive_embeddings, mask_indices, negative_embeddings = batch
-            else:
-                input_sequences, positive_embeddings, mask_indices = batch
-                negative_embeddings = None
+            # Now InfoNCE also uses explicit negatives, so batch should have 4 elements
+            input_sequences, positive_embeddings, mask_indices, negative_embeddings = batch
 
             sequence_output = self.model(input_sequences)
 
@@ -45,36 +42,81 @@ class BERTTrainer(AbstractTrainer):
             projected_positive_embeddings = F.normalize(projected_positive_embeddings, p=2, dim=1)
 
             if self.args.loss_type == 'infonce':
-                sim_matrix = torch.matmul(anchor_embeddings, projected_positive_embeddings.t()) / self.temperature
-                
-                if self.use_hard_negative_mining:
-                    batch_size = sim_matrix.size(0)
-                    mask = torch.eye(batch_size, device=sim_matrix.device).bool()
-                    negative_scores = sim_matrix.masked_fill(mask, -float('inf'))
-                    hardest_negative_scores, _ = negative_scores.max(dim=1, keepdim=True)
-                    positive_scores = sim_matrix.diag().unsqueeze(1)
-                    logits = torch.cat([positive_scores, hardest_negative_scores], dim=1)
-                    labels = torch.zeros(batch_size, dtype=torch.long, device=sim_matrix.device)
-                    loss = F.cross_entropy(logits, labels)
-                else:
-                    labels = torch.arange(sim_matrix.size(0), device=sim_matrix.device)
-                    loss = F.cross_entropy(sim_matrix, labels)
-            
-            else: # bce or gbce
-                pos_logits = (anchor_embeddings * projected_positive_embeddings).sum(dim=1)
+                # 1. In-batch similarity matrix
+                in_batch_sim_matrix = torch.matmul(anchor_embeddings, projected_positive_embeddings.t()) / self.temperature
 
-                # In-batch negatives
-                in_batch_scores = torch.matmul(anchor_embeddings, projected_positive_embeddings.t())
-                mask = torch.eye(in_batch_scores.size(0), device=in_batch_scores.device).bool()
-                neg_logits = in_batch_scores[~mask].view(in_batch_scores.size(0), -1)
-
-                # Explicit negatives
+                # 2. Explicit negative scores
+                explicit_negative_scores = torch.tensor([], device=anchor_embeddings.device)
                 if negative_embeddings is not None and negative_embeddings.numel() > 0:
                     negative_embeddings = negative_embeddings.to(anchor_embeddings.device)
                     projected_negative_embeddings = model.projection_layer(negative_embeddings)
                     projected_negative_embeddings = F.normalize(projected_negative_embeddings, p=2, dim=1)
-                    explicit_negative_scores = (anchor_embeddings.unsqueeze(1) * projected_negative_embeddings).sum(dim=-1)
-                    neg_logits = torch.cat([neg_logits, explicit_negative_scores], dim=1)
+                    # Corrected matmul for explicit negatives
+                    explicit_negative_scores = torch.matmul(anchor_embeddings.unsqueeze(1), projected_negative_embeddings.transpose(1, 2)).squeeze(1) / self.temperature
+
+                # 3. Combine scores
+                positive_scores = in_batch_sim_matrix.diag().unsqueeze(1)
+                mask = torch.eye(in_batch_sim_matrix.size(0), device=in_batch_sim_matrix.device).bool()
+                in_batch_negative_scores = in_batch_sim_matrix.masked_fill(mask, -float('inf'))
+
+                if self.use_hard_negative_mining:
+                    full_negative_pool = torch.cat([in_batch_negative_scores, explicit_negative_scores], dim=1)
+                    batch_size = full_negative_pool.size(0)
+                    if batch_size <= 1:
+                        return torch.tensor(0.0, device=in_batch_sim_matrix.device, requires_grad=True)
+
+                    if self.args.use_curriculum_learning:
+                        # Refined Curriculum: Keep total negatives constant, vary the mix of hard/easy.
+                        total_negatives_in_loss = batch_size - 1
+                        
+                        k_initial = self.args.hard_negative_curriculum_k_initial
+                        k_final = self.args.hard_negative_curriculum_k_final
+                        total_epochs = self.args.hard_negative_curriculum_total_epochs
+                        
+                        if self.epoch < total_epochs:
+                            num_hard = k_initial + int((k_final - k_initial) * (self.epoch / total_epochs))
+                        else:
+                            num_hard = k_final
+                        
+                        num_hard = min(num_hard, total_negatives_in_loss)
+                        num_easy = total_negatives_in_loss - num_hard
+
+                        hard_negative_scores, _ = full_negative_pool.topk(num_hard, dim=1)
+                        
+                        easy_negative_scores = torch.empty(batch_size, 0, device=in_batch_sim_matrix.device)
+                        if num_easy > 0:
+                            # To get easy negatives, we sort the pool and take the easiest ones that are not the hard ones
+                            # A simpler proxy is to take the easiest overall from the combined pool
+                            easy_negative_scores, _ = full_negative_pool.topk(num_easy, dim=1, largest=False)
+
+                        logits = torch.cat([positive_scores, hard_negative_scores, easy_negative_scores], dim=1)
+
+                    else:
+                        # Original hard negative mining (single hardest from the combined pool)
+                        hardest_negative_scores, _ = full_negative_pool.max(dim=1, keepdim=True)
+                        logits = torch.cat([positive_scores, hardest_negative_scores], dim=1)
+
+                else: # Standard InfoNCE with combined negatives
+                    all_scores = torch.cat([in_batch_sim_matrix, explicit_negative_scores], dim=1)
+                    # The diagonal of in_batch_sim_matrix corresponds to the positive scores
+                    # So we can use the full matrix and set the labels to 0
+                    logits = all_scores
+
+                labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
+                loss = F.cross_entropy(logits, labels)
+            
+            else: # bce or gbce
+                pos_logits = (anchor_embeddings * projected_positive_embeddings).sum(dim=1)
+
+                # Explicit negatives ONLY
+                if negative_embeddings is not None and negative_embeddings.numel() > 0:
+                    negative_embeddings = negative_embeddings.to(anchor_embeddings.device)
+                    projected_negative_embeddings = model.projection_layer(negative_embeddings)
+                    projected_negative_embeddings = F.normalize(projected_negative_embeddings, p=2, dim=1)
+                    neg_logits = (anchor_embeddings.unsqueeze(1) * projected_negative_embeddings).sum(dim=-1)
+                else:
+                    # This path should not be taken if using bce/gbce with negative sampling, but as a safeguard:
+                    neg_logits = torch.empty(anchor_embeddings.size(0), 0, device=anchor_embeddings.device)
 
                 if self.args.loss_type == 'bce':
                     pos_labels = torch.ones_like(pos_logits)
@@ -89,19 +131,12 @@ class BERTTrainer(AbstractTrainer):
                     t = self.args.gbce_q
                     beta = alpha * ((1 - 1/alpha)*t + 1/alpha)
 
-                    # transform positive logits
-                    eps = 1e-10
-                    positive_probs = torch.sigmoid(pos_logits)
-                    positive_probs_g = torch.pow(positive_probs, beta)
-                    positive_probs_g = torch.clamp(positive_probs_g, eps, 1 - eps)
-                    pos_logits_transformed = torch.log(positive_probs_g / (1 - positive_probs_g))
-
-                    # calculate loss
-                    pos_labels = torch.ones_like(pos_logits_transformed)
+                    # More stable gBCE calculation
+                    pos_labels = torch.ones_like(pos_logits)
                     neg_labels = torch.zeros_like(neg_logits)
-                    pos_loss = F.binary_cross_entropy_with_logits(pos_logits_transformed, pos_labels)
+                    pos_loss = F.binary_cross_entropy_with_logits(pos_logits, pos_labels)
                     neg_loss = F.binary_cross_entropy_with_logits(neg_logits, neg_labels)
-                    loss = pos_loss + neg_loss
+                    loss = (pos_loss * beta) + neg_loss
             
             return loss
         else:
