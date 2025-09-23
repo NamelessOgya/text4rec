@@ -32,7 +32,10 @@ This project uses [Poetry](https://python-poetry.org/) for dependency management
 
 ### Datasets
 
-The framework is designed to work with sequential datasets like [MovieLens](https://grouplens.org/datasets/movielens/) and [Amazon Review Data](https://jmcauley.ucsd.edu/data/amazon/). The dataloaders will automatically download the required dataset if it's not found locally. The dataset can be specified in the configuration files.
+This framework supports multiple datasets:
+
+-   **Amazon Review Data:** Used for the text-enhanced models (`t4r.yaml`, `sasrec.yaml`). The model leverages rich text information from this dataset to generate item embeddings. The dataloader will automatically download the data specified in the config file.
+-   **MovieLens:** Used for the baseline BERT4Rec model (`b4r.yaml`).
 
 ### Running Experiments
 
@@ -50,3 +53,9 @@ The core configurations are located in the `params/` directory:
 -   `sasrec.yaml`: Configuration for our proposed gSASRec model.
 
 You can modify `cmd/experiment.sh` to run different experiments or create new `.yaml` configuration files to test different models and hyperparameters.
+
+## Results
+
+The following chart compares the performance of our proposed gSASRec model against the baseline B4R model, demonstrating a significant improvement in recommendation accuracy.
+
+![gSASRec vs B4R Results](Images/t4rvsb4r.png)
