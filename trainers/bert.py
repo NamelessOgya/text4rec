@@ -174,10 +174,23 @@ class BERTTrainer(AbstractTrainer):
             return metrics
         else:
             seqs, candidates, labels = batch
-            logits = self.model(seqs)
             
-            last_logits = logits[:, -1, :] # B x V
-            scores = last_logits.gather(1, candidates) # B x C
+            # Get the hidden state from the BERT model, before the large output layer.
+            bert_output = model.bert(seqs) # (B, L, H)
+            last_hidden_state = bert_output[:, -1, :] # (B, H)
+
+            # Get the weights and biases from the final output layer.
+            output_layer = model.out # nn.Linear(H, V)
+            candidate_weights = output_layer.weight[candidates] # (B, C, H)
+            candidate_biases = output_layer.bias[candidates] # (B, C)
+
+            # Calculate scores only for the candidate items.
+            # Reshape last_hidden_state for broadcasting: (B, 1, H)
+            last_hidden_state = last_hidden_state.unsqueeze(1)
+            
+            # Perform batch matrix multiplication: (B, 1, H) @ (B, H, C) -> (B, 1, C)
+            scores = torch.bmm(last_hidden_state, candidate_weights.transpose(1, 2)).squeeze(1)
+            scores += candidate_biases # Add biases
             
             metrics = recalls_and_ndcgs_for_ks(scores, labels, self.metric_ks)
             return metrics
