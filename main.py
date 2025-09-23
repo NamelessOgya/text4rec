@@ -1,6 +1,7 @@
 import torch
 import os
 import shutil
+import time
 
 from options import args
 from models import model_factory
@@ -33,7 +34,17 @@ def train():
     train_loader, val_loader, test_loader = dataloader_factory(args)
     model = model_factory(args)
     trainer = trainer_factory(args, model, train_loader, val_loader, test_loader, export_root)
+    
+    start_time = time.time()
     trainer.train()
+    end_time = time.time()
+    training_time = end_time - start_time
+
+    # Save training time
+    time_log_path = os.path.join(export_root, "training_time.txt")
+    with open(time_log_path, 'w') as f:
+        f.write(f"Training time: {training_time:.2f} seconds\n")
+    print(f"Training time saved to {time_log_path}")
 
 
     if args.do_test:

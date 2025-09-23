@@ -3,19 +3,23 @@
 # 1. Set parameter file
 DEFAULT_CONFIG_FILE="params/default.yaml"
 CONFIG_FILE=$DEFAULT_CONFIG_FILE
+PYTHON_ARGS=()
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
+    case "$1" in
         --config_name)
         CONFIG_FILE="$2"
         shift # past argument
         shift # past value
         ;;
-        *)    # unknown option
-        echo "Unknown option for run_and_log.sh: $1"
-        exit 1
+        --debug)
+        PYTHON_ARGS+=("--debug")
+        shift # past argument
+        ;;
+        *)    # pass to python script
+        PYTHON_ARGS+=("$1")
+        shift
         ;;
     esac
 done
@@ -30,14 +34,15 @@ export PARAMS_FILE=$CONFIG_FILE
 echo "Using parameter file: ${PARAMS_FILE}"
 
 # 2. Generate nichika_run_id and create current_run.yaml
-timestamp=$(date +%Y%m%d%H%M%S)
+timestamp=$(TZ=Asia/Tokyo date +%Y%m%d%H%M%S)
 nichika_run_id="exp_${timestamp}"
 echo "nichika_run_id: ${nichika_run_id}" > current_run.yaml
 
 # 3. Run the training
 echo "Starting experiment ${nichika_run_id}..."
 
-poetry run python main.py
+# Pass the collected arguments to the python script
+poetry run python main.py "${PYTHON_ARGS[@]}"
 
 # 4. The result saving is handled by the python script.
 # The python script is modified to read current_run.yaml and save the results

@@ -24,6 +24,8 @@ parser.add_argument('--test_model_path', type=str, default=None)
 # Dataset
 ################
 parser.add_argument('--dataset_code', type=str, default='ml-20m', choices=DATASETS.keys())
+parser.add_argument('--amazon_url', type=str, default=None, help='URL for Amazon dataset')
+parser.add_argument('--amazon_metadata_url', type=str, default=None, help='URL for Amazon metadata')
 parser.add_argument('--min_rating', type=int, default=3, help='Only keep ratings greater than equal to this value')
 parser.add_argument('--min_uc', type=int, default=3, help='Only keep users with more than min_uc ratings')
 parser.add_argument('--min_sc', type=int, default=0, help='Only keep items with more than min_sc ratings')
@@ -37,6 +39,7 @@ parser.add_argument('--recreate_data', action='store_true', help='If set, delete
 # Dataloader
 ################
 parser.add_argument('--dataloader_code', type=str, default='bert', choices=DATALOADERS.keys())
+parser.add_argument('--use_prefix_augmentation', action='store_true', help='Whether to use prefix augmentation for training')
 parser.add_argument('--dataloader_random_seed', type=float, default=0.0)
 parser.add_argument('--train_batch_size', type=int, default=64)
 parser.add_argument('--val_batch_size', type=int, default=64)
@@ -58,6 +61,13 @@ parser.add_argument('--test_negative_sampling_seed', type=int, default=None)
 # Trainer
 ################
 parser.add_argument('--trainer_code', type=str, default='bert', choices=TRAINERS.keys())
+parser.add_argument('--use_hard_negative_mining', action='store_true', help='Whether to use hard negative mining in InfoNCE loss')
+parser.add_argument('--use_curriculum_learning', action='store_true', help='Whether to use curriculum learning for hard negative mining.')
+parser.add_argument('--hard_negative_curriculum_k_initial', type=int, default=1, help='Initial number of hard negatives for curriculum learning.')
+parser.add_argument('--hard_negative_curriculum_k_final', type=int, default=10, help='Final number of hard negatives for curriculum learning.')
+parser.add_argument('--hard_negative_curriculum_total_epochs', type=int, default=50, help='Total epochs for curriculum learning schedule.')
+parser.add_argument('--loss_type', type=str, default='infonce', choices=['infonce', 'bce', 'gbce'], help='Type of loss function to use.')
+parser.add_argument('--gbce_q', type=float, default=0.5, help='The q parameter for gBCE loss.')
 # device #
 parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda'])
 parser.add_argument('--num_gpu', type=int, default=1)
@@ -107,6 +117,7 @@ parser.add_argument('--bert_num_blocks', type=int, default=None, help='Number of
 parser.add_argument('--bert_num_heads', type=int, default=None, help='Number of heads for multi-attention')
 parser.add_argument('--bert_dropout', type=float, default=None, help='Dropout probability to use throughout the model')
 parser.add_argument('--bert_mask_prob', type=float, default=None, help='Probability for masking items in the training sequence')
+parser.add_argument('--infonce_temperature', type=float, default=0.07, help='Temperature for InfoNCE loss')
 # DAE #
 parser.add_argument('--dae_num_items', type=int, default=None, help='Number of total items')
 parser.add_argument('--dae_num_hidden', type=int, default=0, help='Number of hidden layers in DAE')
@@ -125,6 +136,7 @@ parser.add_argument('--vae_dropout', type=float, default=0.5, help='Probability 
 ################
 parser.add_argument('--experiment_dir', type=str, default='experiments')
 parser.add_argument('--experiment_description', type=str, default='test')
+parser.add_argument('--debug', action='store_true', help='Whether to run in debug mode')
 
 
 ################
