@@ -1,12 +1,14 @@
 from .bert import BERTTrainer
 from .dae import DAETrainer
 from .vae import VAETrainer
+from .sasrec import SASTrainer
 
 
 TRAINERS = {
     BERTTrainer.code(): BERTTrainer,
     DAETrainer.code(): DAETrainer,
-    VAETrainer.code(): VAETrainer
+    VAETrainer.code(): VAETrainer,
+    SASTrainer.code(): SASTrainer,
 }
 
 

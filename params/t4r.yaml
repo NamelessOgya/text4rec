@@ -1,6 +1,10 @@
 # Parameters for BERT4Rec training, based on train_bert template
 mode: train
 dataset_code: amazon
+amazon_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/AMAZON_FASHION.json.gz
+# amazon_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/Movies_and_TV.json.gz
+amazon_metadata_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_AMAZON_FASHION.json.gz
+# amazon_metadata_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_Movies_and_TV.json.gz
 min_rating: 0
 min_uc: 5
 min_sc: 0
@@ -19,15 +23,17 @@ test_negative_sample_size: 100
 test_negative_sampling_seed: 98765
 
 trainer_code: bert
+use_hard_negative_mining: false
+use_prefix_augmentation: false
 device: cuda
 num_gpu: 1
 device_idx: '0'
 optimizer: Adam
 lr: 0.001
 enable_lr_schedule: true
-decay_step: 25
+decay_step: 10
 gamma: 1.0
-num_epochs: 3
+num_epochs: 200
 metric_ks: [1, 5, 10, 20, 50, 100]
 best_metric: NDCG@10
 
@@ -40,12 +46,13 @@ bert_mask_prob: 0.15
 bert_max_len: 100
 bert_num_blocks: 2
 bert_num_heads: 4
+infonce_temperature: 0.07 # Temperature for InfoNCE loss
 
 do_test: true
 
 # Parameters from emb_b4r.sh
 experiment_description: "bertemb_test_from_script"
-generate_item_embeddings: true
+generate_item_embeddings: false
 item_embedding_path: "Data/preprocessed/amazon_min_rating0-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy"
 projection_mlp_dims: [512, 256]
 projection_dropout: 0.1

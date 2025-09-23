@@ -1,15 +1,16 @@
-from datasets import dataset_factory
+from .base import AbstractDataloader
 from .bert import BertDataloader
-from .bertemb import  BertEmbeddingDataloader
+from .bertemb import BertEmbeddingDataloader
 from .ae import AEDataloader
-
+from .sasrec import SASEmbDataloader
+from datasets import dataset_factory
 
 DATALOADERS = {
     BertDataloader.code(): BertDataloader,
     AEDataloader.code(): AEDataloader,
     BertEmbeddingDataloader.code(): BertEmbeddingDataloader,
+    SASEmbDataloader.code(): SASEmbDataloader,
 }
-
 
 def dataloader_factory(args):
     dataset = dataset_factory(args)

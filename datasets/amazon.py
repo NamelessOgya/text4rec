@@ -11,24 +11,20 @@ from .utils import *
 import os
 
 class AmazonDataset(AbstractDataset):
+    def __init__(self, args):
+        super().__init__(args)
+        self.amazon_url = args.amazon_url
+        self.amazon_metadata_url = args.amazon_metadata_url
+
     @classmethod
     def code(cls):
         return 'amazon'
 
-    @classmethod
-    def url(cls):
-        # 例: home/kitchen
-        # return 'https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/Home_and_Kitchen.json.gz'
-    
-        # amazon fashion
-        return 'https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/AMAZON_FASHION.json.gz'
+    def url(self):
+        return self.amazon_url
 
-    @classmethod
-    def metadata_url(cls):
-        # 例: home/kitchen
-        # return 'https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_Home_and_Kitchen.json.gz'
-        # amazon fashion
-        return 'https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/metaFiles2/meta_AMAZON_FASHION.json.gz'
+    def metadata_url(self):
+        return self.amazon_metadata_url
 
     @classmethod
     def is_zipfile(cls):
@@ -137,7 +133,7 @@ class AmazonDataset(AbstractDataset):
         # テキストが空、またはNaNの行を削除
         df = df.dropna(subset=['text'])
         df = df[df['text'] != '']
-        # df = df[["asin", "text"]]
+        # df = df(("asin", "text"))
 
         return df
 
