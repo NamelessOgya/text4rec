@@ -10,12 +10,6 @@ The general architecture involves using pre-trained text embeddings to represent
 
 ### Key Improvements
 
-While B4R (BERT4Rec) achieves high accuracy by calculating a softmax loss over the entire item vocabulary, its performance is known to degrade when using a sampled softmax, often falling short of SASRec. This challenge is discussed in the paper at https://arxiv.org/abs/2308.07192.
-
-To overcome this limitation, we have implemented a novel approach by replacing the B4R architecture with **SASRec** and using a **gBCE (Generalized Binary Cross-Entropy)** loss.
-
-This method avoids the computationally expensive full softmax required by B4R, enabling efficient training on large-scale datasets while aiming to achieve comparable or superior accuracy.
-
 ## Setup
 
 This project uses [Poetry](https://python-poetry.org/) for dependency management.
