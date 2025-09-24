@@ -50,6 +50,6 @@ You can modify `cmd/experiment.sh` to run different experiments or create new `.
 
 ## Results
 
-The following chart compares the performance of our proposed gSASRec model against the baseline B4R model, demonstrating a significant improvement in recommendation accuracy.
+The following chart compares the performance of our proposed text-enhanced gSASRec model against the baseline B4R model, demonstrating a significant improvement in recommendation accuracy.
 
 ![gSASRec vs B4R Results](Images/t4rvsb4r.png)
