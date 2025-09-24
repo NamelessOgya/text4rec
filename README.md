@@ -44,7 +44,7 @@ This script runs a series of experiments defined within it. Each line calls `san
 The core configurations are located in the `params/` directory:
 -   `b4r.yaml`: Configuration for the baseline BERT4Rec model.
 -   `t4r.yaml`: Configuration for the text-enhanced BERT4Rec model (T4R).
--   `sasrec.yaml`: Configuration for our proposed gSASRec model.
+-   `sasrec.yaml`: Configuration for our proposed the text-enhanced gSASRec model.
 
 You can modify `cmd/experiment.sh` to run different experiments or create new `.yaml` configuration files to test different models and hyperparameters.
 
