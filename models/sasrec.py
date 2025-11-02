@@ -60,7 +60,7 @@ class SASRecModel(BaseModel):
     def code(cls):
         return 'sasrec'
 
-    def forward(self, x, targets=None):
+    def forward(self, x):
         # If the input is a LongTensor of item IDs, look up the embeddings
         if x.dtype == torch.long:
             # Create a mask for padding tokens (ID 0)
@@ -78,27 +78,12 @@ class SASRecModel(BaseModel):
 
         # --- Apply Quantization if enabled ---
         if self.args.quantize:
-            vq_loss = None
-            vq_indices = None
-            if self.args.quantizer_type == 'dynamic' and self.training and targets is not None:
-                # Dynamic Quantization (during training)
-                target_embeddings = self.item_embeddings[targets]
-                contextualized_target = self.pre_bert_mlp(target_embeddings)
-                
-                # Attend to target embedding based on context
-                # Query: context vector, Key/Value: target embedding
-                contextualized_target = self.context_attention(x, contextualized_target, contextualized_target)
-                
-                vq_output = self.quantizer(contextualized_target)
-                sequence_output = vq_output['quantized']
-                vq_loss = vq_output['loss']
-                vq_indices = vq_output['indices']
-            else:
-                # Static Quantization (or dynamic during inference as fallback)
-                vq_output = self.quantizer(x)
-                sequence_output = vq_output['quantized']
-                vq_loss = vq_output['loss']
-                vq_indices = vq_output['indices']
+            # The 'dynamic' quantizer path that used targets was fundamentally leaky and has been removed.
+            # All quantization now happens on the transformer output.
+            vq_output = self.quantizer(x)
+            sequence_output = vq_output['quantized']
+            vq_loss = vq_output['loss']
+            vq_indices = vq_output['indices']
             
             return {'sequence_output': sequence_output, 'vq_loss': vq_loss, 'vq_indices': vq_indices}
         

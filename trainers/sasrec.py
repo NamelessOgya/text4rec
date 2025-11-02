@@ -27,7 +27,7 @@ class SASTrainer(AbstractTrainer):
         seqs, labels = batch
 
         # Get model output (dictionary with sequence_output, vq_loss, and vq_indices)
-        model_output = self.model(seqs, targets=labels)
+        model_output = self.model(seqs)
         output_vectors = model_output['sequence_output']
         vq_loss = model_output['vq_loss']
         vq_indices = model_output['vq_indices']
@@ -45,7 +45,11 @@ class SASTrainer(AbstractTrainer):
         if len(positive_ids) == 0:
             rec_loss = torch.tensor(0.0, device=seqs.device, requires_grad=True)
         else:
-            # Get positive embeddings and project them
+            # Get embeddings for alignment loss (from input)
+            input_ids_flat = seqs.view(-1)[padding_mask]
+            input_embeddings_orig = model.item_embeddings[input_ids_flat]
+
+            # Get positive embeddings for rec loss (from labels)
             positive_embeddings_orig = model.item_embeddings[positive_ids]
             positive_embeddings = model.projection_layer(positive_embeddings_orig)
 
@@ -129,11 +133,11 @@ class SASTrainer(AbstractTrainer):
             
             code_embeddings = codebook[vq_indices_flat]
             
-            # Project original item embeddings to the same dimension as the codebook
-            projected_positive_embeddings = model.pre_bert_mlp(positive_embeddings_orig)
+            # Project original INPUT embeddings to the same dimension as the codebook
+            projected_input_embeddings = model.pre_bert_mlp(input_embeddings_orig)
 
-            # Align with projected item embeddings
-            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_positive_embeddings.detach(), dim=-1)).mean()
+            # Align VQ codes (from transformer output) with original input item embeddings
+            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_input_embeddings.detach(), dim=-1)).mean()
             total_loss += self.args.code_alignment_loss_weight * alignment_loss
 
         return total_loss
