@@ -1,4 +1,4 @@
-# Parameters for SASRec training
+# Parameters for SASRec training with quantization
 mode: train
 dataset_code: amazon
 amazon_url: https://mcauleylab.ucsd.edu/public_datasets/data/amazon_v2/categoryFiles/AMAZON_FASHION.json.gz
@@ -13,7 +13,7 @@ train_batch_size: 128
 val_batch_size: 128
 test_batch_size: 128
 
-train_negative_sampler_code: text_similar
+train_negative_sampler_code: random
 train_negative_sample_size: 64 # Used in trainer
 train_negative_sampling_seed: 0
 test_negative_sampler_code: random
@@ -47,7 +47,7 @@ infonce_temperature: 0.07
 
 do_test: true
 
-experiment_description: "sasrec_emb_test"
+experiment_description: "sasrec_quantize_test"
 generate_item_embeddings: false
 item_embedding_path: "Data/preprocessed/amazon_min_rating0-min_uc5-min_sc0-splitleave_one_out/item_embeddings.npy"
 projection_mlp_dims: [256]
@@ -57,3 +57,14 @@ recreate_data: false
 # For gBCE loss
 loss_type: gbce
 gbce_q: 0.5
+
+# Quantization parameters
+quantize: true
+quantizer_type: 'static' # 'static' or 'dynamic'
+num_codes: 512
+commitment_cost: 0.25
+
+# Ablation study parameters
+use_code_alignment_loss: false
+code_alignment_loss_weight: 0.1
+use_semi_synthetic_ns: false

@@ -48,7 +48,7 @@ parser.add_argument('--test_batch_size', type=int, default=64)
 ################
 # NegativeSampler
 ################
-parser.add_argument('--train_negative_sampler_code', type=str, default='random', choices=['popular', 'random'],
+parser.add_argument('--train_negative_sampler_code', type=str, default='random', choices=['popular', 'random', 'text_similar'],
                     help='Method to sample negative items for training. Not used in bert')
 parser.add_argument('--train_negative_sample_size', type=int, default=100)
 parser.add_argument('--train_negative_sampling_seed', type=int, default=None)
@@ -118,6 +118,15 @@ parser.add_argument('--bert_num_heads', type=int, default=None, help='Number of 
 parser.add_argument('--bert_dropout', type=float, default=None, help='Dropout probability to use throughout the model')
 parser.add_argument('--bert_mask_prob', type=float, default=None, help='Probability for masking items in the training sequence')
 parser.add_argument('--infonce_temperature', type=float, default=0.07, help='Temperature for InfoNCE loss')
+# Quantization #
+parser.add_argument('--quantize', action='store_true', help='Whether to use vector quantization.')
+parser.add_argument('--quantizer_type', type=str, default='static', choices=['static', 'dynamic'], help='Type of quantizer to use.')
+parser.add_argument('--num_codes', type=int, default=512, help='Number of codes in the codebook.')
+parser.add_argument('--commitment_cost', type=float, default=0.25, help='Commitment cost for VQ loss.')
+parser.add_argument('--use_code_alignment_loss', action='store_true', help='Whether to use code embedding alignment loss.')
+parser.add_argument('--code_alignment_loss_weight', type=float, default=0.1, help='Weight for the code alignment loss.')
+parser.add_argument('--use_semi_synthetic_ns', action='store_true', help='Whether to use semi-synthetic negative sampling.')
+
 # DAE #
 parser.add_argument('--dae_num_items', type=int, default=None, help='Number of total items')
 parser.add_argument('--dae_num_hidden', type=int, default=0, help='Number of hidden layers in DAE')

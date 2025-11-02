@@ -26,10 +26,12 @@ class SASTrainer(AbstractTrainer):
         model = self.model.module if self.is_parallel else self.model
         seqs, labels = batch
 
-        # (B, S, H)
-        output_vectors = self.model(seqs)
+        # Get model output (dictionary with sequence_output, vq_loss, and vq_indices)
+        model_output = self.model(seqs, targets=labels)
+        output_vectors = model_output['sequence_output']
+        vq_loss = model_output['vq_loss']
+        vq_indices = model_output['vq_indices']
 
-        # Reshape for vectorized processing
         # (B*S, H)
         anchor_embeddings = output_vectors.view(-1, output_vectors.size(-1))
         # (B*S)
@@ -41,65 +43,108 @@ class SASTrainer(AbstractTrainer):
         positive_ids = positive_ids[padding_mask]
 
         if len(positive_ids) == 0:
-            return torch.tensor(0.0, device=seqs.device, requires_grad=True)
+            rec_loss = torch.tensor(0.0, device=seqs.device, requires_grad=True)
+        else:
+            # Get positive embeddings and project them
+            positive_embeddings_orig = model.item_embeddings[positive_ids]
+            positive_embeddings = model.projection_layer(positive_embeddings_orig)
 
-        # Get positive embeddings and project them
-        positive_embeddings_orig = model.item_embeddings[positive_ids]
-        positive_embeddings = model.projection_layer(positive_embeddings_orig)
+            # --- Negative Sampling ---
+            if self.args.use_semi_synthetic_ns:
+                # Semi-synthetic Negative Sampling
+                num_neg_samples = self.args.train_negative_sample_size
+                num_items = self.train_loader.dataset.item_count
+                
+                # Get random items to mix with
+                random_indices = torch.randint(1, num_items + 1, 
+                                             (len(positive_ids),),
+                                             device=seqs.device)
+                random_embeddings_orig = model.item_embeddings[random_indices]
 
-        # Vectorized negative sampling
-        num_neg_samples = self.args.train_negative_sample_size
-        num_items = self.train_loader.dataset.item_count
+                # Create synthetic embeddings by blending
+                alpha = torch.rand(random_embeddings_orig.shape[0], 1, device=seqs.device) * 0.5 # Blend factor 0-0.5
+                synthetic_neg_embeddings_orig = alpha * positive_embeddings_orig.detach() + (1 - alpha) * random_embeddings_orig
+                
+                # Project and reshape for loss calculation
+                negative_embeddings = model.projection_layer(synthetic_neg_embeddings_orig)
+                negative_embeddings = negative_embeddings.unsqueeze(1).repeat(1, num_neg_samples, 1)
+
+            else:
+                # Standard Negative Sampling
+                num_neg_samples = self.args.train_negative_sample_size
+                num_items = self.train_loader.dataset.item_count
+                
+                neg_indices = torch.randint(1, num_items + 1, 
+                                            (positive_ids.size(0), num_neg_samples), 
+                                            device=seqs.device)
+
+                # Get negative embeddings and project them
+                negative_embeddings_orig = model.item_embeddings[neg_indices]
+                orig_dim = negative_embeddings_orig.size(-1)
+                negative_embeddings = model.projection_layer(negative_embeddings_orig.view(-1, orig_dim))
+                negative_embeddings = negative_embeddings.view(positive_ids.size(0), num_neg_samples, -1)
+
+            # Normalize embeddings
+            anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=1)
+            positive_embeddings = F.normalize(positive_embeddings, p=2, dim=1)
+            negative_embeddings = F.normalize(negative_embeddings, p=2, dim=2)
+
+            # Calculate logits
+            pos_logits = (anchor_embeddings * positive_embeddings).sum(dim=-1)
+            neg_logits = (anchor_embeddings.unsqueeze(1) * negative_embeddings).sum(dim=-1)
+
+            if self.args.loss_type == 'bce':
+                pos_labels = torch.ones_like(pos_logits)
+                neg_labels = torch.zeros_like(neg_logits)
+                pos_loss = F.binary_cross_entropy_with_logits(pos_logits, pos_labels)
+                neg_loss = F.binary_cross_entropy_with_logits(neg_logits, neg_labels)
+                rec_loss = (pos_loss + neg_loss) / 2
+            elif self.args.loss_type == 'gbce':
+                negs_per_pos = self.args.train_negative_sample_size
+                alpha_gbce = negs_per_pos / (num_items - 1)
+                t = self.args.gbce_q
+                beta = alpha_gbce * ((1 - 1/alpha_gbce)*t + 1/alpha_gbce)
+
+                pos_labels = torch.ones_like(pos_logits)
+                neg_labels = torch.zeros_like(neg_logits)
+                pos_loss = F.binary_cross_entropy_with_logits(pos_logits, pos_labels)
+                neg_loss = F.binary_cross_entropy_with_logits(neg_logits, neg_labels)
+                rec_loss = ((pos_loss * beta) + neg_loss) / (beta + 1)
+            else: # Default to InfoNCE
+                all_logits = torch.cat([pos_logits.unsqueeze(1), neg_logits], dim=1)
+                all_logits /= self.temperature
+                labels_infonce = torch.zeros(all_logits.size(0), dtype=torch.long, device=all_logits.device)
+                rec_loss = F.cross_entropy(all_logits, labels_infonce)
         
-        neg_indices = torch.randint(1, num_items + 1, 
-                                    (positive_ids.size(0), num_neg_samples), 
-                                    device=seqs.device)
+        # --- Total Loss Calculation ---
+        total_loss = rec_loss
+        # Add VQ loss if it exists
+        if vq_loss is not None:
+            total_loss += vq_loss
 
-        # Get negative embeddings and project them
-        negative_embeddings_orig = model.item_embeddings[neg_indices]
-        orig_dim = negative_embeddings_orig.size(-1)
-        negative_embeddings = model.projection_layer(negative_embeddings_orig.view(-1, orig_dim))
-        negative_embeddings = negative_embeddings.view(positive_ids.size(0), num_neg_samples, -1)
+        # Add Code Alignment loss if enabled
+        if self.args.use_code_alignment_loss and vq_indices is not None:
+            codebook = model.quantizer.embedding.weight
+            vq_indices_flat = vq_indices.view(-1)[padding_mask]
+            
+            code_embeddings = codebook[vq_indices_flat]
+            
+            # Project original item embeddings to the same dimension as the codebook
+            projected_positive_embeddings = model.pre_bert_mlp(positive_embeddings_orig)
 
-        # Normalize embeddings
-        anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=1)
-        positive_embeddings = F.normalize(positive_embeddings, p=2, dim=1)
-        negative_embeddings = F.normalize(negative_embeddings, p=2, dim=2)
+            # Align with projected item embeddings
+            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_positive_embeddings, dim=-1)).mean()
+            total_loss += self.args.code_alignment_loss_weight * alignment_loss
 
-        # Calculate logits
-        pos_logits = (anchor_embeddings * positive_embeddings).sum(dim=-1)
-        neg_logits = (anchor_embeddings.unsqueeze(1) * negative_embeddings).sum(dim=-1)
-
-        if self.args.loss_type == 'bce':
-            pos_labels = torch.ones_like(pos_logits)
-            neg_labels = torch.zeros_like(neg_logits)
-            pos_loss = F.binary_cross_entropy_with_logits(pos_logits, pos_labels)
-            neg_loss = F.binary_cross_entropy_with_logits(neg_logits, neg_labels)
-            loss = (pos_loss + neg_loss) / 2
-        elif self.args.loss_type == 'gbce':
-            negs_per_pos = self.args.train_negative_sample_size
-            alpha = negs_per_pos / (num_items - 1)
-            t = self.args.gbce_q
-            beta = alpha * ((1 - 1/alpha)*t + 1/alpha)
-
-            pos_labels = torch.ones_like(pos_logits)
-            neg_labels = torch.zeros_like(neg_logits)
-            pos_loss = F.binary_cross_entropy_with_logits(pos_logits, pos_labels)
-            neg_loss = F.binary_cross_entropy_with_logits(neg_logits, neg_labels)
-            loss = ((pos_loss * beta) + neg_loss) / (beta + 1)
-        else: # Default to InfoNCE
-            all_logits = torch.cat([pos_logits.unsqueeze(1), neg_logits], dim=1)
-            all_logits /= self.temperature
-            labels_infonce = torch.zeros(all_logits.size(0), dtype=torch.long, device=all_logits.device)
-            loss = F.cross_entropy(all_logits, labels_infonce)
-        
-        return loss
+        return total_loss
 
     def calculate_metrics(self, batch):
         model = self.model.module if self.is_parallel else self.model
         seqs, candidates, labels = batch
         
-        vectors = self.model(seqs)
+        # Get model output (dictionary)
+        model_output = self.model(seqs)
+        vectors = model_output['sequence_output']
         last_vector = vectors[:, -1, :] # Get the last hidden state
         
         # Project all item embeddings to the same space as the model output

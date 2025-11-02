@@ -1,0 +1,1 @@
+find result -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
