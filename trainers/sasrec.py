@@ -133,7 +133,7 @@ class SASTrainer(AbstractTrainer):
             projected_positive_embeddings = model.pre_bert_mlp(positive_embeddings_orig)
 
             # Align with projected item embeddings
-            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_positive_embeddings, dim=-1)).mean()
+            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_positive_embeddings.detach(), dim=-1)).mean()
             total_loss += self.args.code_alignment_loss_weight * alignment_loss
 
         return total_loss
