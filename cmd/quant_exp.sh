@@ -7,7 +7,7 @@ SEEDS=(0820 0831 0924)
 # SEEDS=(0831)
 LR=0.001
 NEG_SIZE=64
-description_prefix="11021649"
+description_prefix="11030233"
 
 # --- No Quantization (Base Model) ---
 echo "--- Experiments: SASRec (No Quantization) - Base ---"

@@ -121,24 +121,22 @@ class SASTrainer(AbstractTrainer):
                 rec_loss = F.cross_entropy(all_logits, labels_infonce)
         
         # --- Total Loss Calculation ---
-        total_loss = rec_loss
-        # Add VQ loss if it exists
-        if vq_loss is not None:
-            total_loss += vq_loss
-
-        # Add Code Alignment loss if enabled
+        # Define alignment_loss as 0 if not used
+        alignment_loss = torch.tensor(0.0, device=rec_loss.device)
         if self.args.use_code_alignment_loss and vq_indices is not None:
-            codebook = model.quantizer.embedding.weight
-            vq_indices_flat = vq_indices.view(-1)[padding_mask]
-            
-            code_embeddings = codebook[vq_indices_flat]
-            
-            # Project original INPUT embeddings to the same dimension as the codebook
-            projected_input_embeddings = model.pre_bert_mlp(input_embeddings_orig)
+            # --- ISOLATION TEST: Temporarily disable alignment loss calculation ---
+            # codebook = model.quantizer.embedding.weight
+            # vq_indices_flat = vq_indices.view(-1)[padding_mask]
+            # code_embeddings = codebook[vq_indices_flat]
+            # projected_input_embeddings = model.pre_bert_mlp(input_embeddings_orig)
+            # alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_input_embeddings.detach(), dim=-1)).mean()
+            alignment_loss = torch.tensor(0.0, device=rec_loss.device) # Force to zero for test
 
-            # Align VQ codes (from transformer output) with original input item embeddings
-            alignment_loss = (1 - F.cosine_similarity(code_embeddings, projected_input_embeddings.detach(), dim=-1)).mean()
-            total_loss += self.args.code_alignment_loss_weight * alignment_loss
+        # Define vq_loss as 0 if not used
+        vq_loss_val = vq_loss if vq_loss is not None else torch.tensor(0.0, device=rec_loss.device)
+        
+        # Calculate total loss
+        total_loss = rec_loss + vq_loss_val + (self.args.code_alignment_loss_weight * alignment_loss)
 
         return total_loss
 
